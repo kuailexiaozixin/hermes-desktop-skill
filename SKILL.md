@@ -7,7 +7,7 @@ description: >-
   触发词：hermes、hermes-agent、AIAgent、run_agent、给应用加 AI、内嵌 Agent、桌面 AI 对话、业务系统对接智能体、
   GUI 集成 Agent、进程内 agent、在应用里对接 AI、AI 对话面板、工具调用可视化。
   反触发（一般不用）：不涉及对接/集成 hermes 内核的纯脚本调用、仅用 hermes CLI 无需集成、Hermes 官方服务端部署运维。
-version: "1.7.25"
+version: "1.7.26"
 author: agent
 agent_created: true
 platform: multi

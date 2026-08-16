@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [1.7.26] — 2026-08-16
+
+- **修复 `scripts/track_upstream.py` 上游漂移检测缺陷**：原 `check_docs` 的 `drift` 只对比「本地 vs 出厂基线」，导致本地==基线时 `--update-docs` 不触发、**无法发现官网更新**。
+  - `--update-docs` 改为**无条件下载官网最新文档**并与本地对比后覆盖（自动备份 + 更新 `references/docs-baseline.json`）。
+  - 普通检查增加**上游探测**：官网有新版本（即使本地==基线）时报告 `UPSTREAM` 并提示运行 `--update-docs`。
+- **文档二次更新**：`hermes-llms-full.txt` 更新到官网最新 md5 `2d0253cc…`（此前 56f8849b…）。
+- SKILL version 1.7.25 → 1.7.26；`track_upstream.py` 语法与行为已验证。
+
 ## [1.7.25] — 2026-08-16
 
 - **上游文档漂移更新**：`hermes-llms-full.txt` 从出厂基线（md5 `4a51fb…` / 3,273,648 B）更新到官网最新（md5 `56f8849b…` / 3,775,696 B），新增 A2A、ACP Host Integration、Buzz、Egress 凭据注入代理（iron-proxy）、Desktop Native Sign-In (RFC 8252)、Document Extraction、Codebase Ownership Map 等章节。

@@ -104,6 +104,8 @@ def check_pypi(quick: bool) -> dict:
 
 
 def check_docs(update: bool) -> dict:
+    import shutil
+    import tempfile
     base_md5, base_size = _load_docs_baseline()
     res = {"track": "docs", "baseline_md5": base_md5, "baseline_size": base_size}
     if not os.path.isfile(DOCS_PATH):
@@ -116,41 +118,61 @@ def check_docs(update: bool) -> dict:
     res["current_md5"] = cur_md5
     res["current_size"] = cur_size
     res["drift"] = (cur_md5 != base_md5) or (cur_size != base_size)
-    res["status"] = "DRIFT" if res["drift"] else "OK"
 
-    if update and res["drift"]:
-        import shutil
-        import tempfile
-
-        # 触碰出厂文档前先备份到临时目录（不污染技能树），遵守「先备份再改」铁律
+    # —— 网络探测上游最新文档（及时发现官网更新，即使本地==基线）——
+    upstream = None
+    for url in DOCS_URLS:
         try:
-            bak_dir = tempfile.mkdtemp(prefix="hermes_docs_bak_")
-            bak = os.path.join(bak_dir, os.path.basename(DOCS_PATH))
-            shutil.copy(DOCS_PATH, bak)
-            res["backup"] = bak
-        except Exception as e:
-            res["backup_error"] = f"{type(e).__name__}: {e}"
-        for url in DOCS_URLS:
-            try:
-                new = _http_get(url, binary=True)
-                with open(DOCS_PATH, "wb") as f:
-                    f.write(new)
-                new_md5 = hashlib.md5(new).hexdigest()
-                new_size = len(new)
-                # 持久化新基线到 sidecar，避免下次不带 --update-docs 仍报 DRIFT（死循环告警）
-                with open(DOCS_BASELINE_SIDECAR, "w", encoding="utf-8") as f:
-                    json.dump({"md5": new_md5, "size": new_size, "updated_from": url},
-                              f, indent=2, ensure_ascii=False)
-                res["updated_from"] = url
-                res["updated_md5"] = new_md5
-                res["updated_size"] = new_size
-                res["status"] = "UPDATED"
-                res["drift"] = False
-                break
-            except Exception as e:
-                res["update_error"] = f"{type(e).__name__}: {e}"
-    return res
+            upstream = (_http_get(url, binary=True), url)
+            break
+        except Exception:
+            continue
+    if upstream is not None:
+        up_blob, up_url = upstream
+        up_md5 = hashlib.md5(up_blob).hexdigest()
+        up_size = len(up_blob)
+        res["upstream_md5"] = up_md5
+        res["upstream_size"] = up_size
+        res["upstream_drift"] = (up_md5 != base_md5) or (up_size != base_size)
+    else:
+        res["upstream_drift"] = None  # 网络不可达，无法探测
 
+    if update:
+        # —— update 模式：无条件尝试下载官网最新，与本地对比后决定是否覆盖 ——
+        if upstream is None:
+            res["status"] = "SKIPPED"
+            res["update_error"] = "上游不可达，保留本地文档"
+            return res
+        up_blob, up_url = upstream
+        up_md5 = res["upstream_md5"]
+        if up_md5 != cur_md5 or len(up_blob) != cur_size:
+            # 官网与本地不同 → 触碰出厂文档前先备份到临时目录（不污染技能树）
+            try:
+                bak_dir = tempfile.mkdtemp(prefix="hermes_docs_bak_")
+                bak = os.path.join(bak_dir, os.path.basename(DOCS_PATH))
+                shutil.copy(DOCS_PATH, bak)
+                res["backup"] = bak
+            except Exception as e:
+                res["backup_error"] = f"{type(e).__name__}: {e}"
+            with open(DOCS_PATH, "wb") as f:
+                f.write(up_blob)
+            with open(DOCS_BASELINE_SIDECAR, "w", encoding="utf-8") as f:
+                json.dump({"md5": up_md5, "size": len(up_blob), "updated_from": up_url},
+                          f, indent=2, ensure_ascii=False)
+            res.update(status="UPDATED", updated_from=up_url,
+                       updated_md5=up_md5, updated_size=len(up_blob),
+                       drift=False, upstream_drift=False)
+        else:
+            res["status"] = "OK"
+            res["up_to_date"] = True
+        return res
+
+    # —— 非 update 模式：报告状态（官网有新版优先提示）——
+    if res.get("upstream_drift"):
+        res["status"] = "UPSTREAM"   # 官网有新版本，本地仍是旧基线
+    else:
+        res["status"] = "DRIFT" if res["drift"] else "OK"
+    return res
 
 def check_signature() -> dict:
     """从 PyPI 下载最新版 wheel 比对签名，不依赖本地 venv。"""
@@ -297,6 +319,10 @@ def main(argv=None) -> int:
                           f"新 md5={r.get('updated_md5')}")
                 elif st == "MISSING":
                     print(f"[② 文档] MISSING: {r.get('error')}")
+                elif st == "UPSTREAM":
+                    print(f"[② 文档] 🟠 官网有新版本（上游 md5={r.get('upstream_md5')}，"
+                          f"基线 {r.get('baseline_md5')}），本地仍为旧基线，"
+                          f"运行 --update-docs 更新")
                 elif st == "DRIFT":
                     print(f"[② 文档] 🟠 md5/size 变化（{r.get('current_md5')}），"
                           f"考虑 --update-docs")
