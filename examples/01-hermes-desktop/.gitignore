@@ -1,0 +1,23 @@
+# 构建产物
+build/
+dist/
+*.spec
+
+# Python 缓存 / 虚拟环境
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 运行数据（用户态，禁止提交）
+.hermes_data/
+.env
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+
+# 测试产物 / 会话密钥
+.pytest_cache/
+.playwright-cli/
+.sesskey

@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermes-desktop"
+version = "1.0.0"
+description = "Hermes Desktop 通用底座 — 在桌面应用中进程内集成 Hermes Python Library 的完整参考实现（FastHTML + pywebview）"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "kuailexiaozixin" }]
+keywords = ["hermes", "desktop", "fasthtml", "pywebview", "ai-agent", "llm", "webview"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "hermes-agent[web]==0.19.0",
+    "python-fasthtml",
+    "pywebview",
+    "markdown",
+    "uvicorn",
+    "qrcode",
+]
+
+[project.urls]
+Homepage = "https://github.com/kuailexiaozixin/hermes-agent-fasthtml-desktop"
+Repository = "https://github.com/kuailexiaozixin/hermes-agent-fasthtml-desktop"
+Documentation = "https://github.com/kuailexiaozixin/hermes-agent-fasthtml-desktop/tree/main/docs"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.setuptools]
+# 本项目为应用/参考实现（非可安装库），仅声明元数据；运行时依赖 requirements.txt 亦已列出。
+packages = []

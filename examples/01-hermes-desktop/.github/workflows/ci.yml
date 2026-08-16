@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: 语法编译 + 离线测试
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ "3.11", "3.12" ]
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: 语法编译检查（全部 .py）
+        run: |
+          python -m py_compile $(find . -name "*.py" -not -path "./.git/*")
+
+      - name: 离线 import 检查（未装 hermes-agent 时也须可导入）
+        run: python -c "import main; print('main import OK')"
+
+      - name: 运行测试套件（离线桥接 + 回归）
+        run: python -m pytest tests/ -v
+
+      - name: 健康端点冒烟（启动服务）
+        run: |
+          nohup python main.py > server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:5001/healthz > /dev/null; then break; fi
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:5001/healthz && echo " /healthz OK"
+          curl -sf http://127.0.0.1:5001/api/conversations && echo " /api/conversations OK"

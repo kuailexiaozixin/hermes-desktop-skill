@@ -1,0 +1,19 @@
+{
+  "app_name": "Hermes Desktop",
+  "entry": "main.py",
+  "venv_name": "hermes-desktop-01",
+  "requirements": [
+    "hermes-agent[web]==0.19.0",
+    "python-fasthtml",
+    "pywebview",
+    "markdown",
+    "uvicorn",
+    "qrcode"
+  ],
+  "host": "127.0.0.1",
+  "port": 5001,
+  "window": {
+    "width": 920,
+    "height": 700
+  }
+}

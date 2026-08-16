@@ -1,0 +1,5 @@
+# Hermes Desktop 02 · pywebview 多 Agent 客户端运行依赖
+# 由 启动.bat 首次运行时自动安装；也可手动：pip install -r requirements.txt
+pywebview
+aiohttp
+hermes-agent
