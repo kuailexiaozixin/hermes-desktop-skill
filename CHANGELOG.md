@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [1.7.25] — 2026-08-16
+
+- **上游文档漂移更新**：`hermes-llms-full.txt` 从出厂基线（md5 `4a51fb…` / 3,273,648 B）更新到官网最新（md5 `56f8849b…` / 3,775,696 B），新增 A2A、ACP Host Integration、Buzz、Egress 凭据注入代理（iron-proxy）、Desktop Native Sign-In (RFC 8252)、Document Extraction、Codebase Ownership Map 等章节。
+- 依据官网 `https://hermes-agent.nousresearch.com/docs/llms-full.txt` 下载；写入 `references/docs-baseline.json` sidecar 作为新基线。
+- PyPI 版本仍为 `hermes-agent==0.19.0`，源码签名 / API 参考无破坏性漂移（track_upstream ③④ 通过）。
+
 ## [1.7.24] — 2026-08-15
 
 - **新增 `references/18-self-improvement.md`（自进化 / 学习循环设计理念主题文档）**：
