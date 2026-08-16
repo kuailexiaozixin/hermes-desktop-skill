@@ -1,0 +1,27 @@
+# 敏感信息（绝不提交）
+.sesskey
+**/.sesskey
+.env
+**/.env
+
+# 运行时数据（用户态，含密钥/会话/记忆）
+.hermes_data/
+**/.hermes_data/
+
+# Python 缓存 / 虚拟环境
+__pycache__/
+*.pyc
+.venv/
+venv/
+site-packages/
+
+# 浏览器 / 测试产物
+.playwright-cli/
+.pytest_cache/
+
+# 嵌套 git（examples/01 已独立发布到 hermes-agent-fasthtml-desktop，避免 submodule/gitlink）
+examples/01-hermes-desktop/.git/
+
+# 日志 / 临时
+*.log
+*.tmp

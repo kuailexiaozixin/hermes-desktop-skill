@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞报告
+    url: https://github.com/kuailexiaozixin/hermes-desktop-skill/security/advisories/new
+    about: 请通过 GitHub 私密安全报告提交漏洞，勿在公开 issue 中披露

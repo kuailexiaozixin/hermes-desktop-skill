@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  skill-gate:
+    name: 技能门禁（语法 + 文档 + 上游基线）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖（Hermes + PyYAML）
+        run: |
+          pip install --upgrade pip
+          pip install "hermes-agent==0.19.0" pyyaml
+
+      - name: 语法编译检查（scripts + 示例 .py）
+        run: |
+          python -m py_compile $(find scripts examples/01-hermes-desktop examples/02-hermes-pywebview-multiagent examples/03-nesquena-hermes-webui -name "*.py" -not -path "*__pycache__*" 2>/dev/null)
+
+      - name: 技能文件门禁（check_skill_gate）
+        run: python scripts/check_skill_gate.py
+
+      - name: 文档链接完整性（check_doc_links）
+        run: python scripts/check_doc_links.py
+
+      - name: 上游基线核对（track_upstream --quick）
+        run: python scripts/track_upstream.py --quick || echo "上游检查跳过/告警（网络受限不视为失败）"
+
+      - name: 示例离线可导入（01 通用底座）
+        working-directory: examples/01-hermes-desktop
+        run: python -c "import main; print('main import OK')" || echo "（缺运行时依赖时跳过，非门禁失败）"
