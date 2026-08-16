@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Skill: hermes-desktop](https://img.shields.io/badge/Skill-hermes--desktop-blue)](#)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](examples/01-hermes-desktop/pyproject.toml)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](skills/hermes-desktop/examples/01-hermes-desktop/pyproject.toml)
 
 这是一个**灵犀（WPS AI 助手）技能**，也是一份可独立阅读的 **Hermes Agent 桌面集成技术手册**。它把「在桌面应用里集成 Hermes Agent」这件事做成了一整套可复用的参考实现与权威知识库。
 
@@ -27,7 +27,7 @@ python main.py            # 服务模式 → http://127.0.0.1:5001
 # 或 python launcher.py  # pywebview 桌面窗口
 ```
 
-三个示例的完整介绍见 [examples/README.md](examples/README.md)。
+三个示例的完整介绍见 [examples/README.md](skills/hermes-desktop/examples/README.md)。
 
 ## 目录结构
 
@@ -55,7 +55,7 @@ hermes-desktop-skill/
 
 ## 设计理念
 
-Hermes Agent 的根性是**解决「AI 失忆症」**——通过内置学习循环从经验沉淀记忆与技能、consent-aware 写审批、运行越久越强。详见 [references/18-self-improvement.md](references/18-self-improvement.md) 与 [设计理念分析](docs/)。
+Hermes Agent 的根性是**解决「AI 失忆症」**——通过内置学习循环从经验沉淀记忆与技能、consent-aware 写审批、运行越久越强。详见 [references/18-self-improvement.md](skills/hermes-desktop/references/18-self-improvement.md) 与 [设计理念分析](skills/hermes-desktop/docs/)。
 
 ## 许可证
 
