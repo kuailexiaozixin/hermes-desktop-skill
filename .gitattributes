@@ -1,0 +1,3 @@
+# Keep .bat as CRLF (binary) so GitHub release source zips AND git clones
+# both carry CRLF line endings. Windows cmd requires CRLF for .bat files.
+*.bat -text
