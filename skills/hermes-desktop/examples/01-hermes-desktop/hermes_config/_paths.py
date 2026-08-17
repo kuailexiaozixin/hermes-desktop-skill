@@ -9,6 +9,12 @@ import sys
 import threading
 from pathlib import Path
 
+# yaml 为 config.yaml 读写主路径（pyyaml 随 hermes-agent 安装）；缺失时回退 JSON。
+try:
+    import yaml  # type: ignore
+except ImportError:  # pragma: no cover - pyyaml 随 hermes-agent 一并安装
+    yaml = None  # type: ignore
+
 
 
 

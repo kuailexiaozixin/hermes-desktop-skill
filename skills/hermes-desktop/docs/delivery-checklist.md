@@ -14,6 +14,20 @@
   - [ ] `smoke_test_web`：网页无头冒烟，`GET /` 含关键 DOM id + `/healthz` 200（已把 B 档 DOM id 检查自动化）
   - [ ] CI 建议项 `verify_imports` / `check_refs`：仅告警不阻塞（失败也建议修）
 
+## A2. 三系统架构（可选模式，仅当采用三系统分离时）
+
+> 三系统分离是「单工程内嵌」的可选升级（见 `references/18-tristructure-architecture.md`）；未启用则本段不适用。
+
+- [ ] `python scripts/verify_tristructure.py` 全绿（exit 0）：
+  - [ ] `structure_ok`：业务系统/ + 连接系统/ + 替换Agent系统.md 骨架齐全
+  - [ ] `biz_no_agent_import`：业务系统无 import 任何 Agent 模块
+  - [ ] `conn_unique_assembly`：「from server import」仅存在于连接系统（唯一装配点）
+  - [ ] `biz_independent_entry`：业务系统有独立入口（app.py + 启动.bat）
+  - [ ] `agent_purity`：Agent系统（三系统根）无业务痕迹
+- [ ] 融合模式：`连接系统/main.py` 启动后业务路由 + Agent 对话 `/api/chat` 双 200
+- [ ] 独立模式：`业务系统/启动.bat` 独立启动，业务路由 200（无 Agent 对话，符合预期）
+- [ ] 底座替换：按 `替换Agent系统.md` 三步替换后，业务/连接零改动仍可融合装配
+
 ## B. 真实运行（✍️ 人工，最不能省）
 
 - [ ] **启动 `启动.bat` 双击启动**，无需终端、无需额外配置

@@ -31,6 +31,17 @@ def _client_and_root():
     return c, tmp
 
 
+def _read_context_folder(root, rel):
+    """延迟导入 routes.chat._read_context_folder（函数已迁入 routes 包）。
+
+    早期实现把该函数放在 main 模块，重构后迁入 routes.chat；测试沿用旧
+    _read_context_folder 会 AttributeError。此处统一经 routes.chat 调用，
+    避免与代码布局耦合。
+    """
+    from routes import chat as rc
+    return rc._read_context_folder(root, rel)
+
+
 # ── sessions 存取 ───────────────────────────────────────────────────────
 def test_sessions_set_get_context_folder():
     import sessions
@@ -75,7 +86,7 @@ def test_read_context_folder_basic():
     # 二进制（非文本扩展名）不应被读
     (Path(tmp) / "img.bin").write_text("bin", encoding="utf-8")
 
-    info = main._read_context_folder(tmp, "")
+    info = _read_context_folder(tmp, "")
     assert info["error"] is None, info
     assert info["files"] == 2, info  # readme.md + src/a.py
     assert "hello" in info["text"] and "print(1)" in info["text"]
@@ -88,10 +99,10 @@ def test_read_context_folder_empty_and_rel():
     import main
     c, tmp = _client_and_root()
     # 空文件夹 → 无注入
-    info = main._read_context_folder(tmp, "")
+    info = _read_context_folder(tmp, "")
     assert info["files"] == 0 and info["text"] == ""
     # 子目录相对路径（目录不存在 → 无注入）
-    info2 = main._read_context_folder(tmp, "no_such_dir")
+    info2 = _read_context_folder(tmp, "no_such_dir")
     assert info2["error"] == "目录不存在"
     print("  test_read_context_folder_empty_and_rel OK")
 
@@ -101,9 +112,11 @@ def test_read_context_folder_truncation():
     c, tmp = _client_and_root()
     big = Path(tmp) / "big.txt"
     big.write_text("X" * 50000, encoding="utf-8")  # 超过单文件 20KB 上限
-    info = main._read_context_folder(tmp, "")
+    info = _read_context_folder(tmp, "")
     assert info["files"] == 1
-    assert "文件截断" in info["text"]
+    # 复用 Library 的 _truncate_content 做 70/20/10 头尾截断，并标记 truncated=True
+    assert info["truncated"] is True, info
+    assert len(info["text"]) < 50000, info  # 文本已被实际截断
     print("  test_read_context_folder_truncation OK")
 
 

@@ -14,6 +14,46 @@ import hermes_config as hc
 import hermes_features as hf
 import sessions
 import wiki_engine as we
+
+
+# ---------------------------------------------------------------------------
+# 安全防御纵深（复用 hermes Library，对齐官方 8 层安全模型第③层「File write safety」
+# 与凭据脱敏）。Library 文档明确声明 file_safety「NOT a security boundary」——属 OS
+# 权限之外的二次拦截 + 审计。本应用已用 _ws_resolve 根约束做主边界，这里补充：
+#   * 读端点阻断 .env / Hermes 凭据库等敏感文件（file_safety.get_read_block_error）
+#   * 写端点阻断 OS 主目录敏感前缀（.ssh/.aws/.kube/.config/gh…）与 HERMES_HOME 的
+#     sessions/state.db（file_safety.get_write_denied_error）
+# 任一调用失败都「放行」（不阻断正常功能），仅作 best-effort 二次防护。
+# ---------------------------------------------------------------------------
+def _file_safety_read_block(path) -> "str | None":
+    """读取前咨询 Library file_safety；返回阻断原因（应 403）或 None。"""
+    try:
+        from agent.file_safety import get_read_block_error
+        return get_read_block_error(str(path)) or None
+    except Exception:
+        return None
+
+
+def _file_safety_write_denied(path) -> "str | None":
+    """写入前咨询 Library file_safety；返回阻断原因（应 403）或 None。"""
+    try:
+        from agent.file_safety import get_write_denied_error
+        return get_write_denied_error(str(path), verb="Write") or None
+    except Exception:
+        return None
+
+
+def _safe_redact(text):
+    """对可能外泄到前端/传输的文本做密钥脱敏（best-effort；失败则原样返回）。"""
+    if not text:
+        return text
+    try:
+        from agent.redact import redact_sensitive_text
+        return redact_sensitive_text(text, force=True, redact_url_credentials=True)
+    except Exception:
+        return text
+
+
 # 健康自检
 # ---------------------------------------------------------------------------
 @app.get("/healthz")
@@ -28,6 +68,72 @@ def healthz():
     except Exception as e:  # noqa: BLE001
         info["config_error"] = f"{type(e).__name__}: {e}"
     return info
+
+
+@app.get("/api/context-files")
+async def api_context_files(req):
+    """报告当前/指定工作目录下 Hermes 原生上下文文件的发现情况（可见性，便于调试与 QA）。
+
+    仅报告不注入；真正注入由 Hermes 原生 ``build_context_files_prompt(cwd=resolve_context_cwd())``
+    在构造 agent 时完成（受 config.yaml 的 agent.context_files / soul_enabled 控制）。
+    """
+    import agent.prompt_builder as _pb
+    raw = (req.query_params.get("dir") or "").strip()
+    if not raw:
+        raw = os.environ.get("TERMINAL_CWD") or os.getcwd()
+    cwd_path = Path(raw).resolve()
+
+    # 优先级顺序（首匹配胜出，对齐 Library build_context_files_prompt）
+    _PRIORITY = (".hermes.md", "HERMES.md", "AGENTS.md", "CLAUDE.md", ".cursorrules")
+    found_names: list[str] = []
+    for name in _PRIORITY:
+        if (cwd_path / name).is_file():
+            found_names.append(name)
+    mdc_dir = cwd_path / ".cursor" / "rules"
+    mdc_names: list[str] = []
+    if mdc_dir.is_dir():
+        mdc_names = [str(m.relative_to(cwd_path)) for m in sorted(mdc_dir.glob("*.mdc"))]
+    all_names = found_names + mdc_names
+    winner = all_names[0] if all_names else None
+
+    files = []
+    for name in all_names:
+        p = cwd_path / name
+        entry = {"name": name, "path": str(p),
+                 "selected": name == winner, "blocked": False}
+        try:
+            entry["bytes"] = p.stat().st_size
+        except Exception:
+            pass
+        # 注入威胁扫描：仅 winner 会被 Library 真正加载；若其内容含提示注入，
+        # Library 会拦截为 [BLOCKED:]（不注入）。superseded 文件不会被加载，
+        # 这里仍扫描并报知（仅供参考，不影响注入决策）。
+        try:
+            content = p.read_text(encoding="utf-8", errors="ignore")
+            scanned = _pb._scan_context_content(content, name)
+            if scanned.startswith("[BLOCKED:"):
+                entry["blocked"] = True
+        except Exception:
+            pass
+        files.append(entry)
+
+    soul = {"loaded": False, "path": None}
+    try:
+        from hermes_cli.config import get_hermes_home
+        sp = get_hermes_home() / "SOUL.md"
+        soul = {"path": str(sp),
+                "loaded": sp.is_file() and bool(sp.read_text(encoding="utf-8", errors="ignore").strip())}
+    except Exception:
+        pass
+    # 实跑库函数确认注入文本（非空的 "Project Context" 段即表示会被注入）
+    injected = ""
+    try:
+        injected = _pb.build_context_files_prompt(cwd=str(cwd_path)) or ""
+    except Exception:
+        injected = ""
+    return _ok(cwd=str(cwd_path), context_files=files, winner=winner, soul=soul,
+              will_inject=bool(injected.strip()),
+              snippet=(injected[:600] if injected else ""))
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +242,11 @@ def _read_context_folder(root: str, rel: str) -> dict:
         return info
     parts: list[str] = []
     base_str = str(base)
+    # 复用 Library 的注入扫描与截断（惰性导入，失败则退化为朴素截断）
+    try:
+        from agent.prompt_builder import _scan_context_content, _truncate_content
+    except Exception:
+        _scan_context_content = _truncate_content = None
     try:
         for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
             # 不进入跳过目录，避免 node_modules/.git 等巨量/无关内容
@@ -154,13 +265,39 @@ def _read_context_folder(root: str, rel: str) -> dict:
                     continue  # 仅取文本类文件，二进制不读
                 info["files"] += 1
                 fp = Path(dirpath) / fn
+                # 防御纵深：跳过受保护凭据文件（不注入上下文，避免密钥泄漏）
+                if _file_safety_read_block(fp):
+                    continue
                 try:
                     data = fp.read_text(encoding="utf-8", errors="replace")
                 except Exception:
                     parts.append("\n# " + os.path.relpath(fp, base_str) + "\n（读取失败）")
                     continue
+                # 注入前威胁扫描：对齐 Hermes Library 的 _scan_context_content 守卫。
+                # 命中提示注入则返回 "[BLOCKED: ...]" 标记——不注入该文件内容，
+                # 仅记入 blocked_files 供前端/调试可见，绝不污染对话上下文。
+                if _scan_context_content is not None:
+                    try:
+                        scanned = _scan_context_content(data, fn)
+                    except Exception:
+                        scanned = data
+                else:
+                    scanned = data
+                if scanned.startswith("[BLOCKED:"):
+                    info.setdefault("blocked_files", []).append(os.path.relpath(fp, base_str))
+                    continue
+                data = scanned
+                # 单文件超过上限：标记 truncated 并复用 Library 的 70/20/10 头尾截断
+                # （直接复用，避免自行实现比例漂移）；truncated 供前端「上下文已截断」指示。
                 if len(data) > _CTX_MAX_FILE_CHARS:
-                    data = data[:_CTX_MAX_FILE_CHARS] + "\n…(文件截断)"
+                    info["truncated"] = True
+                    if _truncate_content is not None:
+                        try:
+                            data = _truncate_content(data, fn, max_chars=_CTX_MAX_FILE_CHARS)
+                        except Exception:
+                            data = data[:_CTX_MAX_FILE_CHARS] + "\n…(文件截断)"
+                    else:
+                        data = data[:_CTX_MAX_FILE_CHARS] + "\n…(文件截断)"
                 parts.append("\n# " + os.path.relpath(fp, base_str) + "\n" + data)
                 info["chars"] += len(data)
                 if info["chars"] >= _CTX_MAX_TOTAL_CHARS:
@@ -365,7 +502,7 @@ async def api_ws_del_root(req):
     existing = [r for r in (ws.get("roots", []) or [])
                 if str(r.get("path", "")).rstrip(os.sep) != raw]
     ws["roots"] = existing
-    hc._write_config_yaml_full(hc.get_hermes_home(), {**cfg, "workspace": ws})
+    hc.update_config_yaml(hc.get_hermes_home(), {"workspace": ws})
     return _ok(roots=_ws_roots())
 
 
@@ -422,6 +559,10 @@ async def api_ws_read(root: str, path: str = ""):
         return JSONResponse(_err(str(e)), status_code=403)
     if not abs_p.is_file():
         return JSONResponse(_err("文件不存在"), status_code=404)
+    # 防御纵深：凭据/敏感文件读阻断（.env / Hermes 凭据库等）
+    _rb = _file_safety_read_block(abs_p)
+    if _rb:
+        return JSONResponse(_err(_rb), status_code=403)
     try:
         size = abs_p.stat().st_size
     except Exception:
@@ -447,6 +588,10 @@ async def api_ws_write(req):
         return JSONResponse(_err(str(e)), status_code=403)
     if abs_p.is_dir():
         return _err("目标已是目录")
+    # 防御纵深：受保护系统/凭据文件写阻断（OS 主目录 .ssh/.aws/.kube 等）
+    _wd = _file_safety_write_denied(abs_p)
+    if _wd:
+        return JSONResponse(_err(_wd), status_code=403)
     try:
         abs_p.parent.mkdir(parents=True, exist_ok=True)
         abs_p.write_text(body.get("content", "") or "", encoding="utf-8")
@@ -524,6 +669,10 @@ async def api_ws_download(root: str, path: str = ""):
         return JSONResponse(_err(str(e)), status_code=403)
     if not abs_p.is_file():
         return JSONResponse(_err("文件不存在"), status_code=404)
+    # 防御纵深：凭据文件禁止下载
+    _rb = _file_safety_read_block(abs_p)
+    if _rb:
+        return JSONResponse(_err(_rb), status_code=403)
     return FileResponse(str(abs_p), filename=abs_p.name)
 
 
@@ -537,6 +686,10 @@ async def api_ws_attach(req):
         return JSONResponse(_err(str(e)), status_code=403)
     if not abs_p.is_file():
         return _err("文件不存在")
+    # 防御纵深：凭据文件禁止作为附件注入上下文
+    _rb = _file_safety_read_block(abs_p)
+    if _rb:
+        return JSONResponse(_err("该文件受保护，禁止附加：" + _rb), status_code=403)
     up_root = (Path(hc.get_hermes_home()) / "uploads").resolve()
     up_root.mkdir(parents=True, exist_ok=True)
     name, target = _resolve_upload_target(up_root, abs_p.name, rel)
@@ -607,6 +760,99 @@ async def api_ctx_folder_del(req):
     if not r.get("ok"):
         return JSONResponse(r, status_code=400)
     return _ok(context_folder=None)
+
+
+# ============================================================================
+# 上下文 / 压缩（对齐官方 tips 文档：token 跟踪 + 主动压缩端点）
+#   说明：token 用量来自会话 usage（sessions.usage_input/output）；若某会话从未被
+#   写入 usage，则 usage_percent=0、should_compress=False（仍返回有效状态，不报错）。
+# ===========================================================================
+@app.get("/api/context/status")
+def api_ctx_status(conv_id: str = ""):
+    """实时上下文水位：active_engine / context_window / threshold_tokens /
+    usage_percent / should_compress / compression_count / session_tokens。"""
+    import context_provider as cp
+    try:
+        return _ok(**cp.get_context_status(cid=conv_id))
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(_err(f"获取上下文状态失败：{e}"), status_code=500)
+
+
+@app.get("/api/context/engines")
+def api_ctx_engines():
+    """列出可用上下文压缩引擎 + 当前启用。"""
+    import context_provider as cp
+    try:
+        return _ok(**cp.list_engines())
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(_err(f"获取引擎列表失败：{e}"), status_code=500)
+
+
+@app.post("/api/context/engine")
+async def api_ctx_engine(req):
+    """切换 context.engine（写 config.yaml: context.engine）。"""
+    import context_provider as cp
+    try:
+        body = await req.json()
+    except Exception:
+        body = {}
+    engine_id = (body.get("engine_id") or "").strip()
+    if not engine_id:
+        return _err("缺少 engine_id")
+    try:
+        r = cp.switch_engine(engine_id)
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(_err(f"切换失败：{e}"), status_code=500)
+    if not r.get("ok"):
+        return JSONResponse(_err(r.get("error") or "切换失败"), status_code=400)
+    return _ok(**r)
+
+
+@app.post("/api/context/compress")
+async def api_ctx_compress(req):
+    """对指定会话历史主动跑 ContextCompressor 压缩（tips: /compress 的进程内等价）。
+    保真校验：压缩后不得丢失 user 消息，否则拒绝覆盖（避免丢历史）；未实际压缩
+    （消息数不足/已最简）则不写回，仅报告原因。"""
+    try:
+        body = await req.json()
+    except Exception:
+        body = {}
+    cid = (body.get("conv_id") or "").strip()
+    if not cid:
+        return _err("缺少 conv_id")
+    if sessions.get(cid) is None:
+        return JSONResponse(_err("会话不存在"), status_code=404)
+    msgs = sessions.get_messages(cid)
+    if not msgs:
+        return _ok(conv_id=cid, compressed=False, reason="空会话无需压缩",
+                   original_count=0, compressed_count=0)
+    try:
+        from agent.context_compressor import ContextCompressor
+        model = (hc.get_active_model_cfg() or {}).get("model") or "compressor"
+        comp = ContextCompressor(model)
+        compressed = comp.compress(msgs, current_tokens=None, force=True)
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(_err(f"压缩失败：{type(e).__name__}: {e}"), status_code=500)
+    if not isinstance(compressed, list) or not compressed:
+        return _ok(conv_id=cid, compressed=False, reason="引擎未返回有效压缩结果",
+                   original_count=len(msgs), compressed_count=len(msgs))
+    # 保真校验：原始含 user 消息则压缩后也必须含，否则拒绝覆盖
+    orig_users = sum(1 for m in msgs if isinstance(m, dict) and m.get("role") == "user")
+    new_users = sum(1 for m in compressed if isinstance(m, dict) and m.get("role") == "user")
+    if orig_users and new_users < orig_users:
+        return JSONResponse(_err("压缩后用户消息丢失，已拒绝覆盖（保真校验失败）"), status_code=422)
+    if len(compressed) >= len(msgs):
+        # 未实际压缩（消息数不足或已最简），不覆盖写回
+        return _ok(conv_id=cid, compressed=False,
+                   reason=("已最简，无需压缩" if len(compressed) == len(msgs)
+                           else "压缩后未减少"),
+                   original_count=len(msgs), compressed_count=len(compressed))
+    try:
+        sessions.set_messages(cid, compressed)
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(_err(f"写回压缩结果失败：{e}"), status_code=500)
+    return _ok(conv_id=cid, compressed=True,
+               original_count=len(msgs), compressed_count=len(compressed))
 
 
 @app.post("/api/chat")
@@ -696,6 +942,12 @@ async def api_chat(req):
             messages[0] = {"role": "system", "content": messages[0]["content"] + "\n\n" + ctx_block}
         else:
             messages.insert(0, {"role": "system", "content": "以下为本次对话的上下文背景信息：\n\n" + ctx_block})
+    # 原生上下文文件发现目录：会话绑定文件夹优先（让 Hermes 原生发现扫用户项目），
+    # 无绑定则不设（build_agent 回退到启动目录）。与下方自定义「固定文件夹上下文」
+    # （整目录文本注入）是两件互补的事：前者走原生 .hermes.md/AGENTS.md/SOUL.md 发现+安全扫描。
+    _ctx_cwd = None
+    if ctx_folder and (ctx_folder.get("root") or "").strip() and os.path.isdir(ctx_folder["root"]):
+        _ctx_cwd = ctx_folder["root"]
     cancel = _cancel_event(cid)
 
     def wrapped() -> Iterator[bytes]:
@@ -711,6 +963,7 @@ async def api_chat(req):
                 max_iterations=hc.get_loop_max_iterations(),
                 approval_check=ar.extract_approval,
                 deep_think=deep_think, web_search=web_search,
+                working_dir=_ctx_cwd,
                 cancel_event=cancel,
             ):
                 if cancel.is_set():
@@ -764,8 +1017,8 @@ async def api_chat(req):
                 sessions.append(cid, "assistant", final_text)
             out = {
                 "type": "done", "conv_id": cid,
-                "final": final_text,
-                "html": render_markdown(final_text),
+                "final": _safe_redact(final_text),
+                "html": render_markdown(_safe_redact(final_text)),
                 "approval": ar.extract_approval(final_text),
                 "title": sessions.summary(cid)["title"],
                 "changed_files": (final_payload or {}).get("changed_files") or [],

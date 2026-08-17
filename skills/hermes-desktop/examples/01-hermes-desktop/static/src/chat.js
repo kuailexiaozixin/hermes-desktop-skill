@@ -962,6 +962,19 @@ function closeToolCard(turn, tool) {
   return ref;
 }
 
+// 子目录上下文渐进发现：低调、非侵入、防 HTML 注入的信息陈列。
+// 仅把发现的相对路径以 muted 文本追加到消息容器（done 事件只替换 turn.bubble.innerHTML，
+// 该节点是 turn.msg 的兄弟，故不会被覆盖）。同一路径在本轮去重。
+function showContextHint(turn, rel, tool) {
+  if (!turn || !turn.msg) return;
+  turn._ctxHints = turn._ctxHints || new Set();
+  if (turn._ctxHints.has(rel)) return;
+  turn._ctxHints.add(rel);
+  const note = el("div", { class: "ctx-hint muted",
+    text: "🔍 在 " + rel + " 发现子目录上下文提示（已并入工具结果，供本轮参考）" });
+  turn.msg.appendChild(note);
+}
+
 // A4：从工具结果里抽取可预览的文件路径（优先 dict.path，其次字符串里的绝对/盘符路径）
 // （实现见 util.extractFilePath；此处保留透明调用）
 
@@ -1191,6 +1204,14 @@ function handleEvent(obj, turn, appendDelta, myConvId) {
       turn.moa.open = true;
       setPhase("MOA 聚合模型综合中…", "busy", myConvId);
     }
+    return;
+  }
+  if (obj.type === "context_hint") {
+    // 子目录上下文渐进发现提示：纯信息陈列，不改动注入、防 HTML 注入（用 text 而非 innerHTML）
+    const raw = obj.hint || "";
+    const m = raw.match(/\[Subdirectory context discovered:\s*([^\]]+)\]/);
+    const rel = m ? m[1].trim() : "(未知位置)";
+    showContextHint(turn, rel, obj.tool);
     return;
   }
   if (obj.type === "cancelled") {

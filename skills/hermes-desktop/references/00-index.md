@@ -56,6 +56,8 @@
 调用 Python Library 有 5 条**平等可选**路线——进程内直跑 / Hermes 网关 / spawn CLI / API Server / `/v1`——**无先后顺序**，按需选择其一。本文档与示例常以进程内直跑为叙述基线，不代表该路线优先或推荐；跨进程路线的选型与落地见 references/02-integration-core.md §2 路径 D。
 各类框架的接入方式详见 `04-rendering-frameworks.md`（多框架接入与整合）。
 
+> **Hermes 的根性**：它是带**内置自进化学习循环**的 agent（官方自称 *self-improving agent*）——从经验沉淀记忆与技能、consent-aware 写审批、运行越久越强（slogan *"The agent that grows with you"*）。这决定了集成姿态：把 Hermes 当**会积累的数字同事**，而非无状态 API 调用。机制基线见 §4，`memory`/`skill_manage` 的 API 见 `01`/`13`，能力语义见 `08`。
+
 ---
 
 ## 3. 阅读顺序（建议）
@@ -106,7 +108,23 @@ CLI 包      : hermes_cli  ( __version__ = "0.19.0" )  # 含 147 个顶层模块
   但**不是进程内驱动 Agent 的核心入口**——进程内驱动对话的是 `AIAgent`；`hermes_cli` 在桌面集成里的正确用法是
   「辅助逻辑复用」（见 `10-hermes-cli.md` §3），正如 `02` §3 所讲。它和 `AIAgent` 是并列的 Library 组成部分，不是从属关系。
 
----
+**自进化学习循环（Hermes 根性，机制基线 0.19.0）**：
+- **后台 self-improvement review**：每轮后可能触发，fork 独立 `AIAgent`（独立 prompt cache、不影响主会话），决定写入记忆或创建/改进技能。
+- **记忆**：`~/.hermes/memories/`（`MEMORY.md`/`USER.md`），会话开始作为**冻结快照**注入 system prompt（无 `read` 动作，agent 天然看到）；agent 用 `memory` 工具自管理。
+- **技能沉淀**：agent 用 `skill_manage`（`create`/`patch`）把成功流程固化为 `~/.hermes/skills/` 技能，按需加载。
+- **consent-aware（用户知情同意）**：默认通知（`display.memory_notifications`）；可开写审批门（`memory.write_approval` / `skills.write_approval`），后台写入暂存 `/memory pending` → approve/reject。
+- **不可变核心**：托管镜像 `/opt/hermes` 核心不可变，自进化只作用于 `/opt/data` 数据层；核心改动走 PR 发版。
+- **并发约束**：勿让两进程指向同一数据目录（记忆/会话不支持并发写）。
+- **归属**：`memory`/`skill_manage` 工具 API → `01-library-api` / `13-agent-modules`；能力行为语义 → `08-capability-integration`；GUI 落地（审批闭环 / 记忆可视化）→ `02-integration-core` 与 example01。
+
+> 自进化有真实代价（token、技能目录污染、写审批摩擦），集成时需权衡；`memory_notifications`/`write_approval` 等开关见 `01`/`08`。
+
+**系统架构基线（顶层地图，0.19.0）**：
+- **分层主干**：Entry Points（CLI / Gateway / ACP / Batch / API Server / Python Library）→ `AIAgent`（`run_agent.py`）统一内核（Prompt Builder / Provider Resolution / Tool Dispatch）→ Session Storage（SQLite+FTS5）+ Tool Backends（Terminal / Browser / Web / MCP / File / Vision…）。**一条类服务所有入口**，平台差异在入口点不在 agent（platform-agnostic core）。
+- **核心循环**（`run_conversation`）：构建系统提示 → 解析 provider → API 调用（chat_completions / codex_responses / anthropic_messages 三模式）→ 有 tool_calls 则分发改派回环 → 收敛 → 响应 → 落盘 SessionDB。
+- **工具发现链**：`tools/registry.py`（无依赖）← `tools/*.py`（import 时 `registry.register()`）← `model_tools.py` ← `run_agent`/`cli`/`batch_runner`。**自注册，勿手写清单**；PyInstaller 打包别漏触发点（`06`）。
+- **设计原则**：Prompt stability / Observable execution（工具调用经回调可见 = 桌面事件流基础，`01` §4）/ Interruptible / Platform-agnostic core / Loose coupling（注册表 + check_fn 门控）/ Profile isolation（独立 `HERMES_HOME`）。
+- **归属**：各包模块清单 → `10`/`12`/`13`/`14`/`16`；能力语义 → `08`；Library 全貌收口 → `14` §3；本文只给系统级分层地图，不重复模块清单。
 
 ## 5. 单真相源映射（避免重复与漂移）
 
@@ -123,6 +141,7 @@ CLI 包      : hermes_cli  ( __version__ = "0.19.0" )  # 含 147 个顶层模块
 | 能力行为语义（Goals/MOA/…） | `08-capability-integration.md` | 单一行为基线，禁止别处再写能力语义 |
 | `hermes_cli` 模块清单（用途与代表 API） | `10-hermes-cli.md` | 全 147 个顶层模块不遗漏、不重复、不交叉 |
 | llms-full 检索地图 | `00-index.md` §1（本文） | 完整版自 `10-hermes-cli.md` §5 移入，唯一权威检索索引 |
+| 系统架构基线（顶层地图） | `00-index.md` §4（本文） | 分层主干 / 核心数据流 / 设计原则 / 工具发现链；模块清单另见 `10`/`12`/`13`/`14`/`16` |
 | `batch_runner` + 支撑模块 API | `11-library-support.md` | `HERMES_HOME`/会话落盘/自定义工具集/原子写单一参考 |
 | `tools` 包全量子模块 | `12-tools-modules.md` | 113 个嵌套子模块不遗漏、不重复、不交叉 |
 | `agent` 包全量子模块 | `13-agent-modules.md` | 155 个嵌套子模块不遗漏、不重复、不交叉 |

@@ -96,9 +96,11 @@ def test_endpoint_traversal_403():
     r = c.get("/api/workspace/list", params={"root": foreign, "path": "x"})
     assert r.status_code == 403, r.text
     assert "授权" in r.json().get("error", ""), r.text
-    # 即便 path 带 .. ，也永远落在授权根内（不会越界）
+    # path 带 .. 企图跳出授权根：经 _ws_resolve 的 commonpath 越界检查，
+    # 严格返回 403（防御纵深，绝不 neutralize 成 200/404 让逃逸请求「看似成功」）。
     r2 = c.get("/api/workspace/list", params={"root": tmp, "path": "../../../../etc"})
-    assert r2.status_code in (200, 404), r2.text  # 越界被消除，最多是「目录不存在」
+    assert r2.status_code == 403, r2.text
+    assert "越界" in r2.json().get("error", ""), r2.text
     print("  test_endpoint_traversal_403 OK")
 
 

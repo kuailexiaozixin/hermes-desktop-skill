@@ -51,11 +51,11 @@ hermes-desktop-skill/
 | 业务整合与路线选型 | `02-integration-core` / `15-api-server` |
 | GUI 集成与能力 | `03/04/08/11/14` |
 | 环境、打包与质量 | `05-install-and-env` / `06-packaging` / `07-quality-gates` / `09-integration-e2e` |
-| **自进化 / 学习循环理念** | `18-self-improvement` |
+| **自进化 / 学习循环理念** | `00-index`（§2 根性 + §4 机制基线） |
 
 ## 设计理念
 
-Hermes Agent 的根性是**解决「AI 失忆症」**——通过内置学习循环从经验沉淀记忆与技能、consent-aware 写审批、运行越久越强。详见 [references/18-self-improvement.md](references/18-self-improvement.md) 与 [设计理念分析](docs/)。
+Hermes Agent 的根性是**解决「AI 失忆症」**——通过内置学习循环从经验沉淀记忆与技能、consent-aware 写审批、运行越久越强。详见 [references/00-index.md](references/00-index.md)（§2「Hermes 的根性」+ §4「自进化学习循环（机制基线）」）与 [设计理念分析](docs/)。
 
 ## 许可证
 

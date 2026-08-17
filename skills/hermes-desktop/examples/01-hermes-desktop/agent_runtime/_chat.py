@@ -12,6 +12,37 @@ import host_tools
 from ._tools import _CancelRequested, _render_html, _resolve_disabled_toolsets, _resolve_provider, register_pure_python_tools
 
 
+# ---------------------------------------------------------------------------
+# 密钥脱敏（复用 hermes Library 的 agent.redact，对齐官方安全模型「Input
+# sanitization」/脱敏）。SSE 把 delta/reasoning/action/action_result/final 直接
+# 回吐前端与传输层，密钥可能经工具结果或模型输出泄漏；此处做 best-effort 二次
+# 防护：任何异常都「原样返回」，绝不中断流式对话。
+# ---------------------------------------------------------------------------
+def _safe_redact(text):
+    """对可能外泄到前端的文本做密钥脱敏（best-effort；失败则原样返回）。"""
+    if not text:
+        return text
+    try:
+        from agent.redact import redact_sensitive_text
+        return redact_sensitive_text(text, force=True, redact_url_credentials=True)
+    except Exception:
+        return text
+
+
+def _safe_redact_obj(obj):
+    """递归脱敏：dict/list/tuple 中的字符串；非容器/字符串原样返回。best-effort。"""
+    try:
+        if isinstance(obj, str):
+            return _safe_redact(obj)
+        if isinstance(obj, dict):
+            return {k: _safe_redact_obj(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return type(obj)(_safe_redact_obj(v) for v in obj)
+    except Exception:
+        return obj
+    return obj
+
+
 
 def _build_request_overrides(model_cfg: dict) -> "dict | None":
     """把逐模型采样/格式参数归一成 AIAgent 的 ``request_overrides``。
@@ -56,7 +87,8 @@ def build_agent(model_cfg: dict, *,
                 reasoning_callback: Callable | None = None,
                 tool_progress_callback: Callable | None = None,
                 enabled_toolsets: list[str] | None = None,
-                web_search: bool = True) -> Any:
+                web_search: bool = True,
+                working_dir: str | None = None) -> Any:
     """根据模型配置构造进程内 AIAgent（terminal 已禁用）。
 
     web_search=True（默认）保留 web + browser 工具集，使 Agent 可联网检索；
@@ -86,13 +118,17 @@ def build_agent(model_cfg: dict, *,
             _memory_on = True  # Hermes 默认即开启
 
     # 需求3：Soul 人格开关 + 自定义系统提示词（从 config.yaml 读取，会话生效）
+    # 原生上下文文件（.hermes.md/AGENTS.md/CLAUDE.md/.cursorrules/SOUL.md）默认开启，
+    # 与「🔁 循环」目标循环开关解耦：context_files 默认 True，soul_enabled 默认 True。
     _custom_sp = ""
-    _soul_on = False
+    _soul_on = True
+    _context_files_on = True
     try:
         from hermes_config import read_config_yaml
         _acfg = read_config_yaml().get("agent") or {}
         _custom_sp = (_acfg.get("system_prompt") or "").strip()
-        _soul_on = bool(_acfg.get("soul_enabled"))
+        _soul_on = bool(_acfg.get("soul_enabled", True))
+        _context_files_on = bool(_acfg.get("context_files", True))
     except Exception:
         pass
 
@@ -127,8 +163,10 @@ def build_agent(model_cfg: dict, *,
         quiet_mode=True,
         save_trajectories=False,
         skip_memory=not _memory_on,
-        skip_context_files=not _goal_on,
-        load_soul_identity=_soul_on,
+        # 原生上下文文件：上下文文件开关 或 目标循环开启任一即加载（默认开）；
+        # 与 goal loop 解耦后，普通对话也会加载 .hermes.md/AGENTS.md/CLAUDE.md/.cursorrules/SOUL.md。
+        skip_context_files=not (_context_files_on or _goal_on),
+        load_soul_identity=_soul_on or _goal_on,
     )
     if model_cfg.get("api_key"):
         kwargs["api_key"] = model_cfg["api_key"]
@@ -161,6 +199,16 @@ def build_agent(model_cfg: dict, *,
         kwargs["reasoning_callback"] = reasoning_callback
     if tool_progress_callback:
         kwargs["tool_progress_callback"] = tool_progress_callback
+    # 原生上下文文件发现目录：指向用户项目（会话绑定文件夹）或回退到启动目录。
+    # 显式设置 TERMINAL_CWD 会被库视为「已配置路径」原样采纳（绕过 install-tree 守卫），
+    # 使 build_context_files_prompt(cwd=resolve_context_cwd()) 真正扫用户项目。
+    if working_dir and os.path.isdir(working_dir):
+        try:
+            os.environ["TERMINAL_CWD"] = os.path.realpath(working_dir)
+        except Exception:
+            pass
+    else:
+        os.environ.pop("TERMINAL_CWD", None)  # 无绑定→回到启动目录（库回退 os.getcwd()）
     agent = create_agent(**kwargs)
 
     # ── 强制「工具调用护栏」对所有模型生效 ────────────────────────────────
@@ -448,6 +496,7 @@ def stream_agent_chat(messages: list[dict], model_cfg: dict, *,
                       approval_check: Callable[[str], "str | None"] | None = None,
                       deep_think: bool = False,
                       web_search: bool = True,
+                      working_dir: str | None = None,
                       agent_factory: Callable | None = None,
                       timeout: float | None = None,
                       cancel_event: "threading.Event | None" = None,
@@ -469,6 +518,17 @@ def stream_agent_chat(messages: list[dict], model_cfg: dict, *,
     """
     factory = agent_factory or build_agent
 
+    # 子目录上下文渐进发现（SubdirectoryHintTracker）：仅作安全「上报」，不重注入。
+    # Library 内部已用同一机制把发现的 AGENTS.md/CLAUDE.md 等并入工具结果；此处仅
+    # 在工具完成时并行探测，命中则经 SSE 给前端一个低调提示（已威胁扫描+截断+限工作区）。
+    ctx_tracker = None
+    if working_dir:
+        try:
+            from agent.subdirectory_hints import SubdirectoryHintTracker
+            ctx_tracker = SubdirectoryHintTracker(working_dir)
+        except Exception:
+            ctx_tracker = None
+
     def _check_cancel():
         # 最佳努力中断：cancel 事件置位即抛出，让 worker 尽快退出（见 B3）。
         if cancel_event is not None and cancel_event.is_set():
@@ -489,6 +549,14 @@ def stream_agent_chat(messages: list[dict], model_cfg: dict, *,
 
     def on_tool_complete(tool_call_id, name, display_args, result):  # noqa: ANN001
         _check_cancel()
+        # 子目录上下文渐进发现：并行探测工具参数里的目录，命中新 hint 则上报前端低调提示
+        if ctx_tracker is not None:
+            try:
+                hint = ctx_tracker.check_tool_call(name, display_args)
+                if hint:
+                    q.put(("context_hint", name, hint))
+            except Exception:
+                pass
         # 同时发短 preview（日志标题）与解析后的 result（前端判定成功 / 展示 stdout / url）
         q.put(("action_result", name, _preview(result), _parse_tool_result(result)))
 
@@ -553,6 +621,7 @@ def stream_agent_chat(messages: list[dict], model_cfg: dict, *,
             agent = factory(
                 effective_cfg, max_iterations=max_iterations,
                 ephemeral_system_prompt=system_message or None,
+                working_dir=working_dir,
                 tool_start_callback=on_tool_start,
                 tool_complete_callback=on_tool_complete,
                 reasoning_callback=on_reasoning,
@@ -614,31 +683,37 @@ def stream_agent_chat(messages: list[dict], model_cfg: dict, *,
         if kind == "delta":
             assistant_text += item[1]
             streamed_any = True
-            yield _delta_chunk(item[1])
+            yield _delta_chunk(_safe_redact(item[1]))
         elif kind == "reasoning":
-            yield _sse({"type": "reasoning", "text": item[1]})
+            yield _sse({"type": "reasoning", "text": _safe_redact(item[1])})
         elif kind == "action":
-            yield _sse({"type": "action", "tool": item[1], "preview": item[2]})
+            yield _sse({"type": "action", "tool": item[1], "preview": _safe_redact(item[2])})
         elif kind == "action_result":
             yield _sse({"type": "action_result", "tool": item[1],
-                        "preview": item[2], "result": item[3]})
+                        "preview": _safe_redact(item[2]),
+                        "result": _safe_redact_obj(item[3])})
         elif kind == "tool_progress":
             # MoA 参考模型事件透传给前端（chat.js 渲染为「🔄 MOA 参考模型」折叠块）
             yield _sse({"type": "tool_progress", "name": item[1],
                         "args": item[2], "kwargs": item[3]})
+        elif kind == "context_hint":
+            # 子目录上下文渐进发现提示（纯信息陈列；hint 已由 Library 威胁扫描+截断+限工作区，
+            # 此处再经 _safe_redact 兜底脱敏后下发；前端提取路径做低调展示，不注入、不渲染 HTML）
+            yield _sse({"type": "context_hint", "tool": item[1],
+                        "hint": _safe_redact(item[2])})
         elif kind == "final":
             final_text = item[1] or ""
             final_messages = item[2]
             if len(item) > 3:
                 changed_files = item[3] or []
         elif kind == "error":
-            yield _sse({"error": {"message": item[1]}})
+            yield _sse({"error": {"message": _safe_redact(item[1])}})
             errored = True
 
     # 若未产生任何增量但有最终文本（部分模型/路径不走 stream_callback），补发一次
     if not streamed_any and final_text:
         assistant_text = final_text
-        yield _delta_chunk(final_text)
+        yield _delta_chunk(_safe_redact(final_text))
 
     # 自定义审批标记兜底
     if approval_check:
@@ -654,8 +729,9 @@ def stream_agent_chat(messages: list[dict], model_cfg: dict, *,
     # D2：错误路径（worker 异常 / 超时）不再下发 done，避免前端 error 提示被空 done 覆盖、
     #     重复触发 attachMsgActions 与用量上报；错误已由上方 error 事件呈现。
     if not errored:
-        yield _sse({"type": "done", "final": assistant_text or final_text,
-                    "html": _render_html(assistant_text or final_text),
+        _final = assistant_text or final_text
+        yield _sse({"type": "done", "final": _safe_redact(_final),
+                    "html": _render_html(_safe_redact(_final)),
                     "messages": final_messages,
                     "changed_files": changed_files})
 

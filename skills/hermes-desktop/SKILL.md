@@ -7,7 +7,7 @@ description: >-
   触发词：hermes、hermes-agent、AIAgent、run_agent、给应用加 AI、内嵌 Agent、桌面 AI 对话、业务系统对接智能体、
   GUI 集成 Agent、进程内 agent、在应用里对接 AI、AI 对话面板、工具调用可视化。
   反触发（一般不用）：不涉及对接/集成 hermes 内核的纯脚本调用、仅用 hermes CLI 无需集成、Hermes 官方服务端部署运维。
-version: "1.7.27"
+version: "1.7.30"
 author: agent
 agent_created: true
 platform: multi
@@ -130,9 +130,9 @@ when_to_use: >-
 
 | 聚类 | 主导节点 | 何时进 |
 | --- | --- | --- |
-| **A 核心 API 与库结构** | 01-library-api / 10-hermes-cli / 11-library-support / 12-tools-modules / 13-agent-modules / 14-library-infra / 16-gateway-package / 18-self-improvement | 写集成代码、查 `AIAgent` 签名、查模块构成 / 排障 |
+| **A 核心 API 与库结构** | 01-library-api / 10-hermes-cli / 11-library-support / 12-tools-modules / 13-agent-modules / 14-library-infra / 16-gateway-package | 写集成代码、查 `AIAgent` 签名、查模块构成 / 排障 |
 | **B GUI 集成与能力** | 04-rendering-frameworks / 03-capabilities-and-toolsets / 08-capability-integration | 接渲染框架、开关 57 工具集 / 审批闭环、接能力层 |
-| **C 业务整合与路线选型** | 02-integration-core / 15-api-server | 让 Agent 懂业务、选 5 条调用路线、走 API Server / `/v1` |
+| **C 业务整合与路线选型** | 02-integration-core / 15-api-server / 18-tristructure-architecture | 让 Agent 懂业务、选 5 条调用路线、走 API Server / `/v1`、业务成完整系统时按三系统分离 |
 | **D 环境、打包与质量** | 05-install-and-env / 06-packaging / 07-quality-gates / 09-integration-e2e | 建 venv、出单文件 EXE、过门禁、做端到端验证 |
 
 > 交叉提示：`02-integration-core` 同时承载「界面接入」与「路线选型」（进程内三条路径 + §2 路径 D），是 C 的主导、也常被 A/B 引用；
@@ -149,7 +149,6 @@ when_to_use: >-
 | [`references/13-agent-modules.md`](references/13-agent-modules.md) | **`agent` 包参考（155 模块全量枚举 + 六项深度主题）**：§1 逐模块用途 + 内核分类 + 代表 API；§2 深度主题（上下文压缩/记忆/用量遥测/模型路由/一次性调用/安全护栏）含类·方法·集成要点 | 查 `agent` 内核构成 / 排障 / 接入某一项 agent 能力时 |
 | [`references/14-library-infra.md`](references/14-library-infra.md) | **剩余 Hermes 自有基础设施模块**（`gateway`/`cli`/`cron`/`plugins`/`providers`/`acp_adapter`/`tui_gateway`/`mcp_serve`）：用途 + Library 全貌收口 | 确认 Library 还有哪些进程外设施、为什么不起网关时 |
 | [`references/16-gateway-package.md`](references/16-gateway-package.md) | **顶层 `gateway` 包全量模块枚举（77 个 `.py`）**：逐模块用途 + 代表 API + 0.19.0 实际承载的平台清单 | 查网关运行时构成 / 某个 `gateway.*` 模块 / 网关承载哪些平台时 |
-| [`references/18-self-improvement.md`](references/18-self-improvement.md) | **自进化 / 学习循环设计理念**：AI 失忆症 → 内置学习循环（每 10 提示存记忆 / 每 10 工具迭代沉淀技能）→ consent-aware 写审批 → 「越用越强」；记忆与技能分工 + GUI 集成落地要点 | 做长期运行/业务对接智能体、要发挥 Hermes 自进化/记忆技能沉淀、设计学习循环状态可视化时 |
 
 ### B GUI 集成与能力
 
@@ -165,6 +164,7 @@ when_to_use: >-
 | --- | --- | --- |
 | [`references/02-integration-core.md`](references/02-integration-core.md) | **业务系统与 Agent 双向整合（界面接入 + 业务赋能，一个整体）**：进程内三条路径 + SSE 桥接 + 能力→模块地图 + CLI 复用 + 最小骨架 + 治理，加上非侵入扩展面（Skill/MCP/Plugin/Memory）与三种加业务工具方式对比；**§12 含 `ctx.llm` 宿主推理（`PluginLlm.complete/complete_structured` 强类型结构化 + 业务上下文注入）**。**源码派生核实（版本见 00-index 事实基线）** | 做集成/流式/复用 CLI 逻辑、给 Agent 接业务工具/记忆/流程、**要强类型结构化输出（§12）**时 |
 | [`references/15-api-server.md`](references/15-api-server.md) | **API Server 路线完整手册**（判据/三种实现路径/配置/端点全清单/认证安全/接入示例/进程内自建/检查清单） | 要开 API Server / 接 OpenAI 兼容前端 / 走 `/v1` 时 |
+| [`references/18-tristructure-architecture.md`](references/18-tristructure-architecture.md) | **三系统解耦架构（高内聚低耦合的工程级落地）**：业务系统/连接系统/Agent系统 拆分、两层高内聚低耦合（系统间依赖铁律 + 系统内部模块内聚）、底座三步替换法、三系统验证门禁 `verify_tristructure.py` | 业务是完整系统、需独立交付/底座可整体替换/业务与 Agent 必须解耦时（见 §5 ⓪ 架构形态决策） |
 
 ### D 环境、打包与质量
 
@@ -198,6 +198,7 @@ when_to_use: >-
 | `check_api_signature.py` | 源码签名比对（ast 静态解析，不 import） |
 | `probe_library.py` | 探测已装 Library：版本、路径、可导入性 |
 | `check_skill_gate.py` | 技能自身结构门禁 |
+| `verify_tristructure.py` | 三系统架构验证门禁（可选模式）：业务纯净 / 连接唯一装配点 / 独立入口 / 底座纯净；未启用三系统则 SKIP |
 | `ui_window_verify.py`（可选） | FastHTML 路线界面视觉质检（pywebview 原生 DOM 断言 + 截图） |
 | `ui_automate.py`（可选） | FastHTML 路线 UI 交互自动化（点击/输入/导航/断言） |
 
@@ -210,7 +211,14 @@ when_to_use: >-
 > 详细步骤与脚本用法见 [`references/07-quality-gates.md`](references/07-quality-gates.md) §4，本清单为执行主线。
 
 ```
+> **⓪ 架构形态决策（开始前先定形态，见 [`references/18-tristructure-architecture.md`](references/18-tristructure-architecture.md) §4 判据）**：
+> - **单工程内嵌**（默认）：中小型单一应用，复制 `examples/01` 直接加业务——本流程主体。
+> - **三系统分离**：业务是完整系统（需独立交付 / 底座可整体替换 / 业务与 Agent 必须解耦）→ 按 18 号文档把工程拆为 `业务系统/` + `连接系统/` + `Agent系统/`(=01 纯净底座)，装配由连接系统 `fuse_business_into_agent()` 承担。
+
 用户要"在我的应用里加个 AI"（或已有桌面 GUI 应用）
+  │
+  │
+  │   [架构形态决策] 单工程内嵌（默认）→ 本流程；三系统分离 → 见 references/18号文档
   │
   ├─ ⓪ 上游漂移（--quick，不深挖）：track_upstream.py --quick + check_api_signature.py
   │     → 有 REMOVED/DEFAULT_CHANGED 先修技能；无则直接进入对接
@@ -307,3 +315,5 @@ when_to_use: >-
 * 分层：GUI 层 / 桥接层（callback→queue）/ Agent 构造层 / 工具层，四层不混。
 * 工具函数纯 Python 实现，不 shell 调用。
 * 单文件过大主动拆分；框架面（Loops / Delegation / Commands）按功能域拆包（共享工具入 `_utils.py` 防循环导入，`__init__.py` 重导出保持向后兼容），适用于「后端逻辑聚合层」膨胀场景。
+* **高内聚低耦合（工程组织 + 模块设计两层）**：业务是完整系统时，按 [`references/18-tristructure-architecture.md`](references/18-tristructure-architecture.md) 组织为 `业务系统/` + `连接系统/` + `Agent系统/` 三系统：业务系统纯业务（禁 `import` Agent 模块）、连接系统纯桥接（唯一装配点 `fuse_business_into_agent()`）、Agent系统=上游纯净底座（可整体替换）。
+* **同样适用于各系统内部模块**：单一职责、模块分层（路由/服务/桥接/数据不跨层）、共享辅助抽公共模块消除 copy-paste、死代码（未引用模块/函数/import）一律清理（`pyflakes`/`autoflake` 佐证）。

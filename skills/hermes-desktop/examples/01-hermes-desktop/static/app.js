@@ -269,7 +269,82 @@ async function init() {
   await Promise.all([loadHealth(), loadConversations(), loadToolbarSelects()]);
   updateContextIndicator();
   updateUsageChip();
+  initContextChip();
   $("#prompt").focus();
+}
+
+// 上下文水位徽标：轮询 /api/context/status（tips 文档对齐的 token 跟踪），
+// 按占用率着色；点击触发主动压缩（/api/context/compress）。全部自包含，
+// 不改动 ./src/* 内部逻辑。
+function initContextChip() {
+  if (!document.getElementById("ctxChipStyle")) {
+    const st = document.createElement("style");
+    st.id = "ctxChipStyle";
+    st.textContent =
+      ".ctx-chip{font-variant-numeric:tabular-nums;min-width:54px;text-align:center;opacity:.92}" +
+      ".ctx-chip.ok{color:var(--ok)}" +
+      ".ctx-chip.warn{color:var(--warn)}" +
+      ".ctx-chip.danger{color:var(--danger);font-weight:600}" +
+      ".ctx-chip.compress{outline:1px solid var(--danger);outline-offset:1px}" +
+      "html[data-theme='dark'] .ctx-chip.ok{color:#51cf66}" +
+      "html[data-theme='dark'] .ctx-chip.warn{color:#ffa94d}" +
+      "html[data-theme='dark'] .ctx-chip.danger{color:#ff6b6b}";
+    document.head.appendChild(st);
+  }
+  const topbar = document.querySelector(".topbar");
+  if (!topbar) return;
+  let chip = document.getElementById("ctxChip");
+  if (!chip) {
+    chip = el("button", { class: "btn ghost ctx-chip", id: "ctxChip",
+      title: "上下文水位（token 占用 / 压缩状态）；点击主动压缩" });
+    chip.textContent = "🧠 —";
+    const skin = document.getElementById("btnSkin");
+    if (skin) topbar.insertBefore(chip, skin);
+    else topbar.appendChild(chip);
+    chip.addEventListener("click", async () => {
+      const cid = State.conv_id;
+      if (!cid) { toast("请先选择会话", "warn"); return; }
+      try {
+        const r = await fetch("/api/context/compress", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conv_id: cid }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          toast(j.compressed ? `已压缩：${j.original_count} → ${j.compressed_count} 条`
+                              : (j.reason || "无需压缩"), j.compressed ? "ok" : "warn");
+        } else {
+          toast("压缩失败：" + (j.error || r.status), "err");
+        }
+      } catch (e) { toast("压缩请求失败：" + e, "err"); }
+    });
+  }
+  const update = async () => {
+    const cid = State.conv_id;
+    const chipEl = document.getElementById("ctxChip");
+    if (!chipEl) return;
+    if (!cid) { chipEl.textContent = "🧠 —"; chipEl.className = "btn ghost ctx-chip"; return; }
+    try {
+      const r = await fetch("/api/context/status?conv_id=" + encodeURIComponent(cid));
+      const j = await r.json();
+      if (!j.ok) return;
+      const pct = Math.round(j.usage_percent || 0);
+      chipEl.textContent = "🧠 " + pct + "%";
+      let cls = "btn ghost ctx-chip";
+      if (pct >= 85) cls += " danger";
+      else if (pct >= 60) cls += " warn";
+      else cls += " ok";
+      if (j.should_compress) cls += " compress";
+      chipEl.className = cls;
+      chipEl.title = `上下文水位 ${pct}% / 阈值 ${Math.round((j.threshold_percent || 0) * 100)}% · 引擎 ${j.active_engine || "-"}` +
+        (j.should_compress ? " · 建议压缩（点击执行）" : "");
+    } catch (_) { /* 轮询失败静默，不影响对话 */ }
+  };
+  update();
+  setInterval(update, 8000);
+  // 发消息后稍候刷新（会话可能刚创建/追加）
+  const _send = document.getElementById("btnSend");
+  if (_send) _send.addEventListener("click", () => setTimeout(update, 2500));
 }
 
 document.addEventListener("DOMContentLoaded", init);

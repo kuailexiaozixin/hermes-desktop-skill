@@ -43,6 +43,32 @@
 | 主题切换 / 图片附件 | 浅深双主题 / 粘贴上传图片由视觉工具查看 |
 | 桌面打包 | pywebview 原生窗口 + PyInstaller 单文件 EXE |
 
+## 🧩 三系统组织（可选，工程级解耦）
+
+> 本目录默认是**单工程内嵌**底座（业务 + Agent 同工程）。当业务演化成完整系统（需独立交付、底座可整体替换、业务与 Agent 彻底解耦）时，可基于本目录升级为**三系统架构**：
+
+```
+01-hermes-desktop/          # Agent系统 = 纯净 Hermes 底座（本目录，零差异，可整体替换）
+├── 业务系统/               # 纯业务，不 import Agent，独立 EXE
+│   ├── app.py              #   build_app() / mount_rd_routes() / get_business_snapshot()
+│   ├── 启动.bat
+│   └── README.md
+├── 连接系统/               # 纯桥接，唯一装配耦合点
+│   ├── bridge.py           #   fuse_business_into_agent() —— 把业务挂到 Agent 底座
+│   ├── main.py
+│   └── README.md
+└── 替换Agent系统.md         # 底座三步替换法（删除→复制→粘贴）
+```
+
+- **依赖方向**：业务系统 → 连接系统 → Agent系统；业务**禁止 import** Agent 模块。
+- **连接系统是唯一装配点**：挂业务路由、注册工具、注入业务快照、安装技能全部收拢在 `fuse_business_into_agent()`。
+- **Agent系统可整体替换**：保持本目录纯净（无业务痕迹），升级只需三步替换。
+- **独立启动**：`业务系统/启动.bat` 独立跑业务；`连接系统/main.py` 跑「Agent 对话 + 业务路由」融合 app。
+
+> 完整理念见 `references/18-tristructure-architecture.md`；适用前提、决策判据见该文档 §4。默认走单工程内嵌，仅在业务具备完整系统特征时升级三系统。
+
+---
+
 ## 🚀 快速开始
 
 ```bash
