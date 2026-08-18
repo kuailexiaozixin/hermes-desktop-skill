@@ -2,7 +2,7 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 语义化版本规范。
 
-## [Unreleased]
+## [1.2.0] - 2026-08-18
 
 ### 仓库更名与定位：Hermes Desktop · AI Agent 桌面助手
 - **更名**：仓库 `hermes-agent-fasthtml-desktop` 更名为 `hermes-desktop`。

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hermes-desktop"
-version = "1.0.0"
+version = "1.2.0"
 description = "Hermes Desktop 通用底座 — 在桌面应用中进程内集成 Hermes Python Library 的完整参考实现（FastHTML + pywebview）"
 readme = "README.md"
 requires-python = ">=3.10"

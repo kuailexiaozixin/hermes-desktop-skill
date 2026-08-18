@@ -82,6 +82,7 @@
 | 15 | **15-api-server** | **API Server 路线完整手册**（判据/三种实现路径/配置/端点全清单/认证安全/接入示例/进程内自建/检查清单） | 要开 API Server / 接 OpenAI 兼容前端 / 走 `/v1` 时 |
 | 16 | **16-gateway-package** | **顶层 `gateway` 包全量模块枚举（77 个 `.py`）**：逐模块用途 + 代表 API + 0.19.0 实际承载的平台清单 | 查网关运行时构成 / 某个 `gateway.*` 模块 / 网关承载哪些平台时 |
 | 17 | **api-reference/**（自动生成） | **库级 API 参考**（按模块拆分，ast 静态解析自 0.19.0 源码、未 import）：`01-run-agent`（AIAgent 240 方法）/`02-toolsets`/`03-gateway-session`/`04-mcp-serve`，含类、方法、参数（类型注解+默认值）、返回类型、异常 | 需要精确的类/方法/参数/返回/异常签名时（由 `scripts/gen_api_reference.py` 一键重新生成） |
+| 18 | **18-tristructure-architecture** | **三系统解耦架构（高内聚低耦合工程级落地）**：业务系统/连接系统/Agent系统 拆分、两层高内聚低耦合（系统间依赖铁律 + 系统内部模块内聚）、底座三步替换法、三系统验证门禁 `verify_tristructure.py` | 业务是完整系统、需独立交付/底座可整体替换/业务与 Agent 必须解耦时（见 SKILL.md §5 ⓪ 架构形态决策） |
 
 > 不要跳读 01 直接看 03：工具集是 `AIAgent` 的 `enabled_toolsets` / `disabled_toolsets`
 > 参数的输入，构造语义见 01 §3。
