@@ -6,7 +6,7 @@
 [![Skill: hermes-desktop](https://img.shields.io/badge/Skill-hermes--desktop-blue)](#)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](examples/01-hermes-desktop/pyproject.toml)
 
-这是一个**灵犀（WPS AI 助手）技能**，也是一份可独立阅读的 **Hermes Agent 桌面集成技术手册**。它把「在桌面应用里集成 Hermes Agent」这件事做成了一整套可复用的参考实现与权威知识库。
+这是一份可独立阅读的 **Hermes Agent 桌面集成技能与技术手册**。它把「在桌面应用里集成 Hermes Agent」这件事做成了一整套可复用的参考实现与权威知识库。
 
 ## 这是什么
 
@@ -17,7 +17,7 @@
 
 ## 快速开始
 
-把本技能安装为灵犀技能后，直接对话触发即可；或按示例独立运行：
+安装本技能后，直接对话触发即可；或按示例独立运行：
 
 ```bash
 # 参考实现 01 —— 通用桌面底座（功能最全）

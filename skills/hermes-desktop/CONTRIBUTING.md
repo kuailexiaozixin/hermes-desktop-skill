@@ -1,6 +1,6 @@
 # Contributing to hermes-desktop 技能
 
-感谢你愿意为这个技能贡献内容！本仓库既是灵犀技能，也是 Hermes Agent 桌面集成的技术手册。
+感谢你愿意为这个技能贡献内容！本仓库既是 Hermes Agent 桌面集成的技能，也是配套的技术手册。
 
 ## 可以贡献什么
 
