@@ -1,10 +1,10 @@
-# Hermes Desktop · 通用底座
+# Hermes Desktop · AI Agent 桌面助手
 
-> 在桌面应用中**进程内集成 [Hermes Python Library](https://github.com/kuailexiaozixin/hermes-agent)** 的完整参考实现 —— FastHTML 服务端渲染 + pywebview 原生窗口，功能完整迁移、业务彻底解耦。
+> 一个功能完备的 **AI Agent 桌面应用** —— 基于 [Hermes](https://github.com/kuailexiaozixin/hermes-agent) 与 FastHTML 服务端渲染 + pywebview 原生窗口，把桌面 AI 助手的通用能力（多会话流式对话、工具调用、技能市场、MCP、知识库、记忆、定时任务等）整合为开箱即用的桌面程序。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](pyproject.toml)
-[![CI](https://github.com/kuailexiaozixin/hermes-agent-fasthtml-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/kuailexiaozixin/hermes-agent-fasthtml-desktop/actions/workflows/ci.yml)
+[![CI](https://github.com/kuailexiaozixin/hermes-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/kuailexiaozixin/hermes-desktop/actions/workflows/ci.yml)
 
 [English](README.en.md) · [文档](docs/) · [贡献指南](CONTRIBUTING.md) · [安全](SECURITY.md)
 
@@ -12,15 +12,20 @@
 
 ## 它是什么
 
-这是一个**标准、通用的 Hermes Desktop 底座**，演示如何在桌面应用里**进程内集成 Hermes Python Library** 的完整范式。对标官方 Hermes Desktop 的桌面体验，把桌面 AI 助手的通用能力（多会话、流式对话、工具时间线、思考折叠、模型/工具/技能/MCP/循环/委派/定时任务、审批闭环、产物抽屉等）都搬了过来。
+**Hermes Desktop** 是一个可直接运行的 AI Agent 桌面助手，提供完整的桌面 AI 体验：
 
-**设计要点：**
+- **多会话 + 流式对话**：逐字 SSE 输出，服务端持久化，支持新建/切换/重命名/置顶/删除
+- **模型中心**：36 家厂商预设 + 自定义 + 密钥管理
+- **工具 / 技能 / MCP 中心**：内置工具集、技能 CRUD、MCP 增删启停
+- **大一统技能市场**：聚合 SkillHub / skills.sh / clawhub / lobehub / browse-sh / 官方 / GitHub / Claude 共 8 个来源
+- **LLM Wiki 知识库**：三层互联 + 反向链接 + 自动索引 + 图谱
+- **记忆与上下文管理**：provider 切换 + 向量检索 + 分层；`context.engine` 选择 + 压缩 + token 跟踪
+- **循环 / 委派 / 定时任务**：8 内置循环 + 目标拆分给子智能体 + cron 自然语言调度
+- **IM 渠道桥接**：微信/企微/钉钉/飞书/QQ/Slack/Discord/Telegram/Webhook + 二维码登录
+- **审批闭环**：危险命令弹窗确认，纯进程内删除
+- 纯本地运行、离线可用，可打包为单文件 Windows EXE，双击即用
 
-- **进程内直跑** —— 不起 gateway / 独立 HTTP 服务 / Node，直接在进程内 `AIAgent(...)` 集成
-- **业务彻底解耦** —— 零行业术语、零外部业务依赖，自包含可运行
-- **可复制模板** —— 复制本目录，在 `app_tools/` 加自己的业务工具，即可把任意应用接上 Hermes
-
-> `app_tools/` 默认挂载一个**演示工具** `sogou_weixin.py`（搜狗微信搜索），仅作为「如何挂业务工具」的可复制模板；删去 `app_tools/__init__.py` 中 `register_into` 的那一行即回到纯底座。
+> 桌面体验对标官方 Hermes Desktop：思考折叠区、工具时间线、产物抽屉等一应俱全。
 
 ## ✨ 功能亮点
 
@@ -43,32 +48,6 @@
 | 主题切换 / 图片附件 | 浅深双主题 / 粘贴上传图片由视觉工具查看 |
 | 桌面打包 | pywebview 原生窗口 + PyInstaller 单文件 EXE |
 
-## 🧩 三系统组织（可选，工程级解耦）
-
-> 本目录默认是**单工程内嵌**底座（业务 + Agent 同工程）。当业务演化成完整系统（需独立交付、底座可整体替换、业务与 Agent 彻底解耦）时，可基于本目录升级为**三系统架构**：
-
-```
-01-hermes-desktop/          # Agent系统 = 纯净 Hermes 底座（本目录，零差异，可整体替换）
-├── 业务系统/               # 纯业务，不 import Agent，独立 EXE
-│   ├── app.py              #   build_app() / mount_rd_routes() / get_business_snapshot()
-│   ├── 启动.bat
-│   └── README.md
-├── 连接系统/               # 纯桥接，唯一装配耦合点
-│   ├── bridge.py           #   fuse_business_into_agent() —— 把业务挂到 Agent 底座
-│   ├── main.py
-│   └── README.md
-└── 替换Agent系统.md         # 底座三步替换法（删除→复制→粘贴）
-```
-
-- **依赖方向**：业务系统 → 连接系统 → Agent系统；业务**禁止 import** Agent 模块。
-- **连接系统是唯一装配点**：挂业务路由、注册工具、注入业务快照、安装技能全部收拢在 `fuse_business_into_agent()`。
-- **Agent系统可整体替换**：保持本目录纯净（无业务痕迹），升级只需三步替换。
-- **独立启动**：`业务系统/启动.bat` 独立跑业务；`连接系统/main.py` 跑「Agent 对话 + 业务路由」融合 app。
-
-> 完整理念见 `references/18-tristructure-architecture.md`；适用前提、决策判据见该文档 §4。默认走单工程内嵌，仅在业务具备完整系统特征时升级三系统。
-
----
-
 ## 🚀 快速开始
 
 ```bash
@@ -81,7 +60,7 @@ set HERMES_API_KEY=sk-...
 #    b) 或 HERMES_HOME/config.yaml 中配置 provider（参考 .env.example）
 
 # 3. 启动
-python main.py           # 纯服务模式 → 打开 http://127.0.0.1:5001
+python main.py           # 服务模式 → 打开 http://127.0.0.1:5001
 # 或
 python launcher.py       # 桌面窗口模式（pywebview 原生窗口）
 ```
@@ -98,7 +77,7 @@ python build.py          # PyInstaller 单文件 EXE（外置隔离 venv + 完�
 
 ```
 ├── main.py                  # FastHTML 路由层：页面外壳 + /api/* 端点 + SSE 桥接
-├── agent_runtime.py         # 集成内核：build_agent / stream_agent_chat / 审批
+├── agent_runtime.py         # Agent 运行时：build_agent / stream_agent_chat / 审批
 ├── hermes_config.py         # 配置面：模型 / 技能 / MCP / 定时任务 / HERMES_HOME 播种
 ├── hermes_features.py       # 补充功能后端（13 项）
 ├── unified_skills_client.py # 大一统技能市场（聚合 8 源）
@@ -109,7 +88,7 @@ python build.py          # PyInstaller 单文件 EXE（外置隔离 venv + 完�
 ├── frameworks/              # 循环 / 委派 / 指令框架
 ├── routes/                  # FastHTML 路由子包（chat / skills / features / misc / ...）
 ├── channels/                # IM 渠道桥接（10 个连接器）
-├── app_tools/               # 业务工具扩展点（默认挂演示工具）
+├── app_tools/               # 工具扩展点（默认含演示工具）
 ├── static/                  # 前端 UI（app.css / app.js / 各面板）
 ├── docs/                    # 文档（mcp-server.md / integration-notes/）
 ├── tests/                   # 测试套件（离线桥接 / 回归）
@@ -123,7 +102,7 @@ python build.py          # PyInstaller 单文件 EXE（外置隔离 venv + 完�
 
 ```bash
 python -m py_compile *.py          # 语法编译
-python -c "import main"            # 离线可导入（未装 hermes-agent 时优雅降级）
+python -c "import main"            # 离线可导入
 python -m pytest tests/            # 运行测试（含离线桥接）
 ```
 
@@ -131,7 +110,7 @@ python -m pytest tests/            # 运行测试（含离线桥接）
 
 ## 🤝 贡献
 
-欢迎提交 Bug 修复、集成示例、文档改进。请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [行为准则](CODE_OF_CONDUCT.md)。发现安全漏洞请按 [SECURITY.md](SECURITY.md) 私密报告。
+欢迎提交 Bug 修复、功能改进、文档改进。请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [行为准则](CODE_OF_CONDUCT.md)。发现安全漏洞请按 [SECURITY.md](SECURITY.md) 私密报告。
 
 ## 📄 许可证
 

@@ -367,6 +367,22 @@ function bindConvToolbar() {
   if (btnCopy) btnCopy.addEventListener("click", batchCopyConvs);
   if (btnExport) btnExport.addEventListener("click", () => batchExportConvs("md"));
 
+  // G2.5：对话区就地「立即压缩」（引擎压缩 /api/context/compress，与上下文视图一致）
+  const qc = document.getElementById("btnQuickCompress");
+  if (qc) {
+    qc.addEventListener("click", async () => {
+      if (!State.conv_id) { toast("请先选择会话", "err"); return; }
+      qc.disabled = true; qc.textContent = "压缩中…";
+      const r = await postJSON("/api/context/compress", { conv_id: State.conv_id }).catch(e => ({ ok: false, error: e.message }));
+      qc.disabled = false; qc.textContent = "🗜 压缩";
+      if (!r.ok) { toast("压缩失败：" + (r.error || ""), "err"); return; }
+      if (r.compressed) toast("已压缩：" + r.original_count + " → " + r.compressed_count + " 条", "ok");
+      else toast("未压缩：" + (r.reason || ""), "info");
+      updateContextIndicator();
+      if (State.conv_id) openConversation(State.conv_id);
+    });
+  }
+
   // G2：压缩历史上下文按钮（接入已有 /api/conversations/{cid}/compress）
   const ca = document.getElementById("convActions");
   if (ca && !ca.querySelector("#btnConvCompress")) {
@@ -1378,19 +1394,27 @@ function initVoice() {
   });
 }
 
-// ------------------------------------------------------------------ 上下文使用指示器（token 估算）
-function updateContextIndicator() {
+// ------------------------------------------------------------------ 上下文使用指示器（对接 /api/context/status 真实水位；接口不可用时静默降级）
+async function updateContextIndicator() {
   const ind = $("#ctxIndicator");
   if (!ind) return;
-  const ta = $("#prompt");
-  const inputTok = estimateTokens(ta ? ta.textContent : "");
-  const ctxTok = estimateTokens(window.__ctxText || "");
-  const used = inputTok + ctxTok;
-  const pct = Math.min(100, Math.round((used / CONTEXT_CAP) * 100));
-  const warn = pct > 85 ? ' <span class="warn">接近上限</span>' : "";
-  // 空态弱化：未消耗时不展示无意义的 "≈0 tok"，仅保留占用百分比
-  if (used > 0) ind.innerHTML = `上下文 ≈${used.toLocaleString()} tok（${pct}%）${warn}`;
-  else ind.innerHTML = `上下文 ${pct}%`;
+  const cid = State.conv_id;
+  if (!cid) { ind.innerHTML = ""; ind.style.color = ""; return; }
+  const d = await getJSON("/api/context/status?cid=" + encodeURIComponent(cid)).catch(() => ({ ok: false }));
+  if (!d.ok) { ind.innerHTML = ""; ind.style.color = ""; return; }
+  const up = d.usage_percent;
+  const cw = d.context_window;
+  const sc = d.should_compress;
+  if (up == null) {
+    const reason = (d.diagnostics && d.diagnostics.reason) || "模型窗口未知";
+    ind.innerHTML = `上下文 未知（${reason}）`;
+    ind.style.color = "";
+    return;
+  }
+  const cwTxt = cw ? `（${(cw / 1000).toFixed(1)}K 窗口）` : "";
+  const need = up > 85 ? ' <span class="warn">需压缩⚠️</span>' : (sc === true ? ' <span class="warn">达阈值⚠️</span>' : "");
+  ind.innerHTML = `上下文 ${up}%${cwTxt}${need}`;
+  ind.style.color = up > 85 ? "#e53935" : (up > 60 ? "#fb8c00" : "");
 }
 
 // ------------------------------------------------------------------ token 用量累计（估算）

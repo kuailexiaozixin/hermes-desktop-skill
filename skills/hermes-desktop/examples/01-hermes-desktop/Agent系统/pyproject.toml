@@ -33,9 +33,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/kuailexiaozixin/hermes-agent-fasthtml-desktop"
-Repository = "https://github.com/kuailexiaozixin/hermes-agent-fasthtml-desktop"
-Documentation = "https://github.com/kuailexiaozixin/hermes-agent-fasthtml-desktop/tree/main/docs"
+Homepage = "https://github.com/kuailexiaozixin/hermes-desktop"
+Repository = "https://github.com/kuailexiaozixin/hermes-desktop"
+Documentation = "https://github.com/kuailexiaozixin/hermes-desktop/tree/main/docs"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

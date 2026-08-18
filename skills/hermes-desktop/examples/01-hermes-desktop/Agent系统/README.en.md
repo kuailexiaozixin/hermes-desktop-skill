@@ -1,10 +1,10 @@
-# Hermes Desktop · Universal Base
+# Hermes Desktop · AI Agent Desktop App
 
-> A complete reference implementation of **in-process integration of the [Hermes Python Library](https://github.com/kuailexiaozixin/hermes-agent) inside a desktop app** — FastHTML server-side rendering + pywebview native window. Full feature parity, fully decoupled from business logic.
+> A full-featured **AI Agent desktop application** — built on [Hermes](https://github.com/kuailexiaozixin/hermes-agent) with FastHTML server-side rendering + pywebview native window, bundling the general capabilities of a desktop AI assistant (multi-session streaming chat, tool calling, skill marketplace, MCP, knowledge base, memory, scheduler, etc.) into a ready-to-run desktop program.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](pyproject.toml)
-[![CI](https://github.com/kuailexiaozixin/hermes-agent-fasthtml-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/kuailexiaozixin/hermes-agent-fasthtml-desktop/actions/workflows/ci.yml)
+[![CI](https://github.com/kuailexiaozixin/hermes-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/kuailexiaozixin/hermes-desktop/actions/workflows/ci.yml)
 
 [中文](README.md) · [Docs](docs/) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
@@ -12,15 +12,20 @@
 
 ## What It Is
 
-A **standard, universal Hermes Desktop base** that demonstrates the complete pattern for integrating the **Hermes Python Library in-process** inside a desktop application. It mirrors the official Hermes Desktop experience, bringing the general capabilities of a desktop AI assistant (multi-session, streaming chat, tool timeline, thinking folding, model/tool/skill/MCP/loops/delegation/scheduler, approval loop, artifact drawer, etc.) into a single self-contained project.
+**Hermes Desktop** is a ready-to-run AI Agent desktop assistant delivering a complete desktop AI experience:
 
-**Key design points:**
+- **Multi-session + streaming chat**: character-by-character SSE output, server-persisted, create/switch/rename/pin/delete
+- **Model center**: 36 vendor presets + custom + key management
+- **Tools / Skills / MCP center**: built-in toolsets, skill CRUD, MCP add/remove/start/stop
+- **Unified skill marketplace**: aggregates 8 sources (SkillHub / skills.sh / clawhub / lobehub / browse-sh / official / GitHub / Claude)
+- **LLM Wiki knowledge base**: 3-layer interlinked + backlinks + auto-index + graph
+- **Memory & context management**: provider switch + vector search + layered view; `context.engine` selection + compression + token tracking
+- **Loops / delegation / scheduler**: 8 built-in loops + goal delegation to sub-agents + cron NL scheduling
+- **IM channel bridge**: WeChat/WeCom/DingTalk/Feishu/QQ/Slack/Discord/Telegram/Webhook + QR login
+- **Approval loop**: dangerous-command popup confirmation, pure in-process deletion
+- Pure local, offline-capable, packageable as a single-file Windows EXE — double-click to run
 
-- **In-process runtime** — no gateway / separate HTTP service / Node; integrate directly via `AIAgent(...)` in-process
-- **Business-agnostic** — zero business jargon, zero external business dependencies, self-contained
-- **Reusable template** — copy this directory, add your own business tools under `app_tools/`, and wire any app to Hermes
-
-> `app_tools/` ships one **demo tool** `sogou_weixin.py` (Sogou WeChat search) as a copyable template for "how to attach a business tool"; delete the `register_into` line in `app_tools/__init__.py` to return to a pure base.
+> Desktop experience mirrors the official Hermes Desktop: thinking folding, tool timeline, artifact drawer, etc.
 
 ## ✨ Highlights
 
@@ -72,7 +77,7 @@ python build.py          # PyInstaller single-file EXE (isolated venv + full hid
 
 ```
 ├── main.py                  # FastHTML routing: page shell + /api/* endpoints + SSE bridge
-├── agent_runtime.py         # integration core: build_agent / stream_agent_chat / approval
+├── agent_runtime.py         # Agent runtime: build_agent / stream_agent_chat / approval
 ├── hermes_config.py         # configuration: models / skills / MCP / scheduler / HERMES_HOME seeding
 ├── hermes_features.py       # bonus features backend (13)
 ├── unified_skills_client.py # unified skill marketplace (8 sources)
@@ -83,7 +88,7 @@ python build.py          # PyInstaller single-file EXE (isolated venv + full hid
 ├── frameworks/              # loops / delegation / commands framework
 ├── routes/                  # FastHTML route subpackages (chat / skills / features / misc / ...)
 ├── channels/                # IM channel bridge (10 connectors)
-├── app_tools/               # business tool extension point (demo tool included)
+├── app_tools/               # tool extension point (demo tool included)
 ├── static/                  # frontend UI (app.css / app.js / panels)
 ├── docs/                    # docs (mcp-server.md / integration-notes/)
 ├── tests/                   # test suite (offline bridge / regression)
@@ -97,7 +102,7 @@ python build.py          # PyInstaller single-file EXE (isolated venv + full hid
 
 ```bash
 python -m py_compile *.py          # syntax compilation
-python -c "import main"            # offline importable (graceful degradation without hermes-agent)
+python -c "import main"            # offline importable
 python -m pytest tests/            # run tests (incl. offline bridge)
 ```
 
@@ -105,7 +110,7 @@ After startup, `curl /healthz`, `/api/conversations`, `/api/models` return 200.
 
 ## 🤝 Contributing
 
-Contributions of bug fixes, integration examples, and documentation are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security vulnerability, follow [SECURITY.md](SECURITY.md).
+Contributions of bug fixes, feature improvements, and documentation are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). To report a security vulnerability, follow [SECURITY.md](SECURITY.md).
 
 ## 📄 License
 

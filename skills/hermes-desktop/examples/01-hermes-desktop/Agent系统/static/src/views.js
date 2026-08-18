@@ -289,7 +289,7 @@ async function renderContextView() {
   const sp = el("div", { class: "app-view-body" });
   v.appendChild(sp);
   sp.appendChild(el("div", { class: "section-title", text: "上下文管理" }));
-  sp.appendChild(el("div", { class: "muted small", text: "上下文压缩引擎（context.engine）选择 + 压缩状态 + 会话 token 跟踪（对照 13 §2.1）。" }));
+  sp.appendChild(el("div", { class: "muted small", text: "选择上下文压缩引擎、查看会话上下文水位、主动压缩并跟踪压缩历史。" }));
 
   // ── 引擎选择 ──
   const engWrap = el("div", { class: "panel", style: "margin-bottom:12px;" });
@@ -297,8 +297,8 @@ async function renderContextView() {
   const engRow = el("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;" });
   const engSel = el("select", { class: "form-input", style: "max-width:260px;" });
   const engBtn = el("button", { class: "btn primary", text: "切换", onclick: async () => {
-    const r = await postJSON("/api/context/engine", { engine: engSel.value }).catch(e => ({ ok:false, error:e.message }));
-    if (r.ok) { toast("已切换到 " + engSel.value, "ok"); loadEngines(); refreshStatus(); }
+    const r = await postJSON("/api/context/engine", { engine_id: engSel.value }).catch(e => ({ ok:false, error:e.message }));
+    if (r.ok) { toast("已切换为 " + engSel.value + "（新会话/重启后生效）", "ok"); loadEngines(); refreshStatus(); }
     else toast("切换失败：" + (r.error || ""), "err");
   } });
   const engStatus = el("span", { class: "muted small", style: "margin-left:4px;", text: "" });
@@ -309,7 +309,7 @@ async function renderContextView() {
     for (const e of d.engines || []) {
       engSel.appendChild(el("option", { value: e.id, text: e.id + (e.active ? "（当前）" : "") + (e.builtin ? " [内置]" : ""), selected: !!e.active }));
     }
-    engStatus.textContent = "当前：" + (d.current || "");
+    engStatus.textContent = "当前：" + (d.current || "") + "（写入配置，新会话生效）";
   }
   engRow.appendChild(engSel); engRow.appendChild(engBtn); engRow.appendChild(engStatus);
   engWrap.appendChild(engRow);
@@ -317,35 +317,82 @@ async function renderContextView() {
   loadEngines();
 
   // ── 压缩状态 + token 跟踪 ──
-  const stWrap = el("div", { class: "panel" });
+  const stWrap = el("div", { class: "panel", style: "margin-bottom:12px;" });
   stWrap.appendChild(el("div", { class: "card-title", text: "压缩状态 / token 跟踪" }));
   const stRow = el("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;" });
-  stRow.appendChild(el("span", { class: "muted small", text: "当前会话：" + (State.conv_id || "-") }));
+  const hasConv = !!State.conv_id;
+  stRow.appendChild(el("span", { class: "muted small", text: hasConv ? ("当前会话：" + State.conv_id) : "未选择会话——先在左侧选择或新建会话" }));
+  const compressBtn = el("button", { class: "btn" + (hasConv ? " primary" : ""), text: "立即压缩", disabled: !hasConv, onclick: doCompress });
+  stRow.appendChild(compressBtn);
   stRow.appendChild(el("button", { class: "btn", text: "刷新", onclick: refreshStatus }));
   stWrap.appendChild(stRow);
   const stOut = el("div", {});
   stWrap.appendChild(stOut);
   sp.appendChild(stWrap);
 
+  // ── 压缩历史 ──
+  const histWrap = el("div", { class: "panel" });
+  histWrap.appendChild(el("div", { class: "card-title", text: "压缩历史" }));
+  const histOut = el("div", {});
+  histWrap.appendChild(histOut);
+  sp.appendChild(histWrap);
+
+  async function doCompress() {
+    if (!State.conv_id) { toast("请先选择会话", "err"); return; }
+    compressBtn.disabled = true; compressBtn.textContent = "压缩中…";
+    const r = await postJSON("/api/context/compress", { conv_id: State.conv_id }).catch(e => ({ ok:false, error:e.message }));
+    compressBtn.disabled = false; compressBtn.textContent = "立即压缩";
+    if (!r.ok) { toast("压缩失败：" + (r.error || ""), "err"); return; }
+    if (r.compressed) toast("已压缩：" + r.original_count + " → " + r.compressed_count + " 条", "ok");
+    else toast("未压缩：" + (r.reason || ""), "info");
+    refreshStatus(); loadHistory();
+  }
+
+  function fmtN(v) { return (v === null || v === undefined) ? "未知" : v; }
+
   async function refreshStatus() {
     stOut.innerHTML = "";
-    const d = await getJSON("/api/context/status?cid=" + encodeURIComponent(State.conv_id || "")).catch(() => ({ ok:false }));
+    if (!State.conv_id) {
+      stOut.appendChild(el("div", { class: "muted small", text: "请先选择或新建一个会话以查看上下文水位。" }));
+      histOut.innerHTML = "";
+      return;
+    }
+    const d = await getJSON("/api/context/status?cid=" + encodeURIComponent(State.conv_id)).catch(() => ({ ok:false }));
     if (!d.ok) { stOut.appendChild(el("div", { class: "muted", text: d.error || "加载失败" })); return; }
-    const cw = d.context_window || 0;
-    const cwTxt = cw ? (cw >= 1000 ? (cw/1000).toFixed(1) + "K" : String(cw)) : "未知（该模型未在 models.dev 收录）";
-    const up = d.usage_percent || 0;
-    const sc = d.should_compress ? "需要压缩 ⚠️" : "未触发";
-    stOut.appendChild(el("div", { class: "small", style: "margin-top:4px;", text: "活动引擎：" + (d.active_engine || "-") + (d.engine_live ? "（实时）" : "") }));
-    stOut.appendChild(el("div", { class: "small", text: "上下文窗口：" + cwTxt + " · 压缩阈值：" + (d.threshold_tokens || "未知") }));
-    stOut.appendChild(el("div", { class: "small", text: "压缩次数：" + (d.compression_count || 0) + " · 判定：" + sc }));
-    stOut.appendChild(el("div", { class: "small", style: "margin-top:4px;", text: "会话 token：输入 " + (d.session_tokens ? d.session_tokens.input : 0) + " / 输出 " + (d.session_tokens ? d.session_tokens.output : 0) + " · 已用 " + up + "%" }));
-    const bar = el("div", { style: "height:10px;background:#eee;border-radius:5px;margin-top:8px;overflow:hidden;" });
-    const fill = el("div", { style: "height:100%;width:" + Math.min(100, up) + "%;background:" + (up > 80 ? "#e53935" : up > 60 ? "#fb8c00" : "#43a047") + ";" });
-    bar.appendChild(fill);
-    stOut.appendChild(bar);
+    const cw = d.context_window;
+    const cwTxt = cw ? (cw >= 1000 ? (cw/1000).toFixed(1) + "K" : String(cw)) : "未知";
+    const up = d.usage_percent;
+    const sc = d.should_compress === true ? "需要压缩 ⚠️" : (d.should_compress === false ? "未触发" : "未知");
+    stOut.appendChild(el("div", { class: "small", style: "margin-top:4px;", text: "活动引擎：" + (d.active_engine || "-") + (d.engine_live ? "（实时）" : "（推算）") }));
+    stOut.appendChild(el("div", { class: "small", text: "上下文窗口：" + cwTxt + " · 压缩阈值：" + (d.threshold_tokens ?? "未知") }));
+    stOut.appendChild(el("div", { class: "small", text: "压缩次数：" + fmtN(d.compression_count) + " · 判定：" + sc }));
+    const diag = d.diagnostics || {};
+    if (diag.reason) stOut.appendChild(el("div", { class: "small muted", style: "margin-top:2px;", text: "提示：" + diag.reason }));
+    stOut.appendChild(el("div", { class: "small", style: "margin-top:4px;", text: "会话 token：" + (d.session_tokens ? ("输入 " + (d.session_tokens.input||0) + " / 输出 " + (d.session_tokens.output||0)) : "无数据") + (up != null ? " · 已用 " + up + "%" : "") }));
+    if (up != null) {
+      const bar = el("div", { style: "height:10px;background:#eee;border-radius:5px;margin-top:8px;overflow:hidden;" });
+      const fill = el("div", { style: "height:100%;width:" + Math.min(100, up) + "%;background:" + (up > 80 ? "#e53935" : up > 60 ? "#fb8c00" : "#43a047") + ";" });
+      bar.appendChild(fill);
+      stOut.appendChild(bar);
+    }
   }
-  refreshStatus();
+
+  async function loadHistory() {
+    histOut.innerHTML = "";
+    if (!State.conv_id) { histOut.appendChild(el("div", { class: "muted small", text: "选择会话后显示压缩历史。" })); return; }
+    const d = await getJSON("/api/context/history?conv_id=" + encodeURIComponent(State.conv_id)).catch(() => ({ ok:false }));
+    if (!d.ok) { histOut.appendChild(el("div", { class: "muted small", text: "加载历史失败" })); return; }
+    const hs = d.history || [];
+    if (!hs.length) { histOut.appendChild(el("div", { class: "muted small", text: "暂无压缩记录。" })); return; }
+    for (const h of hs) {
+      histOut.appendChild(el("div", { class: "small", style: "margin-top:2px;",
+        text: "[" + h.at + "] " + h.original_count + " → " + h.compressed_count + " 条（节省 " + h.saved + "）" + (h.reason ? " · " + h.reason : "") }));
+    }
+  }
+
+  refreshStatus(); loadHistory();
 }
+
 
 async function renderSyspromptView() {
   const v = $("#view-sysprompt"); if (!v) return;

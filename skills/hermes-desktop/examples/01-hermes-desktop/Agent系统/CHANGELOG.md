@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### 仓库更名与定位：Hermes Desktop · AI Agent 桌面助手
+- **更名**：仓库 `hermes-agent-fasthtml-desktop` 更名为 `hermes-desktop`。
+- **定位**：作为 **AI Agent 桌面应用**（Hermes Agent Desktop）描述；README/README.en 更新为完整的桌面 AI 助手介绍，移除「参考实现 / 集成 / 解耦 / 底座」等相关表述。
+
+### 结构调整：Agent系统 独立维护
+- **结构**：本仓库作为独立的 Hermes Desktop 应用，独立维护与发布，不再内嵌任何业务内容。
+- **增强**：补充 `.gitattributes`（.bat 保持 CRLF），保证 Windows 下启动脚本在 release 源码包与 clone 中编码一致。
+
 ### 上下文文件（Context Files）原生支持对齐
 - **修正**：原生上下文文件此前被错误绑在「🔁 循环」目标循环开关上（`skip_context_files=not _goal_on`，默认关），
   普通对话不加载 `.hermes.md`/`AGENTS.md`/`CLAUDE.md`/`.cursorrules`。现已与 goal loop 解耦，

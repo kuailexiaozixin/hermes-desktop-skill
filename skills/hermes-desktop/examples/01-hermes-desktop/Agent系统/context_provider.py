@@ -124,41 +124,84 @@ def _session_tokens(cid=None) -> dict:
 
 
 def get_context_status(home=None, cid=None) -> dict:
-    """压缩状态 + token 跟踪汇总。
+    """压缩状态 + token 跟踪汇总（修正口径：真实优先 + N/A 语义 + 诊断）。
 
     返回：active_engine / context_window / threshold_tokens / usage_percent /
-    should_compress / compression_count / session_tokens；引擎可加载实例时补充
-    其真实运行时字段（engine_live=True）。
+    should_compress / compression_count / session_tokens / diagnostics；
+    引擎可加载实例时以其真实运行时字段优先（engine_live=True），否则用推算值并
+    明确标出 N/A（None）而非伪 0，避免误导。
     """
     active = get_active_engine(home)
+    diag = {"engine_loaded": False, "model_known": True, "reason": ""}
     ctx_len = _model_context_window()
-    threshold = int(ctx_len * _THRESHOLD_PERCENT) if ctx_len else 0
-    tok = _session_tokens(cid)
-    last_prompt = int(tok["input"])
+    if not ctx_len:
+        diag["model_known"] = False
+        diag["reason"] = ("当前模型未在 models.dev 收录，无法推算上下文窗口；"
+                           "引擎实例可提供真实值时不受影响")
+    threshold = int(ctx_len * _THRESHOLD_PERCENT) if ctx_len else None
+    tok = _session_tokens(cid) if cid else None
+    last_prompt = int(tok["input"]) if tok else None
 
     status = {
         "active_engine": active,
         "default_engine": _DEFAULT_ENGINE,
-        "context_window": ctx_len,
+        "context_window": ctx_len or None,
         "threshold_tokens": threshold,
         "threshold_percent": _THRESHOLD_PERCENT,
         "last_prompt_tokens": last_prompt,
-        "usage_percent": round(min(100, last_prompt / ctx_len * 100), 1) if ctx_len else 0,
-        "should_compress": bool(threshold and last_prompt >= threshold),
-        "compression_count": 0,
+        "usage_percent": round(last_prompt / ctx_len * 100, 1)
+                         if (ctx_len and last_prompt is not None) else None,
+        "should_compress": None,
+        "compression_count": None,
         "session_tokens": tok,
+        "diagnostics": diag,
     }
 
     inst = _load_engine_instance(active)
     if inst is not None:
+        diag["engine_loaded"] = True
         try:
             gs = inst.get_status() or {}
+            live = False
             for k in ("last_prompt_tokens", "threshold_tokens", "context_length",
                       "usage_percent", "compression_count"):
-                if gs.get(k):
+                if gs.get(k) is not None:
                     status[k] = gs[k]
             if gs.get("threshold_tokens") or gs.get("context_length"):
                 status["engine_live"] = True
+                live = True
+            # 优先用引擎真实窗口/水位判定，其次用推算值
+            lp = status.get("last_prompt_tokens")
+            thr = status.get("threshold_tokens")
+            if live and lp is not None and thr is not None:
+                status["should_compress"] = bool(lp >= thr)
+            elif lp is not None and threshold is not None:
+                status["should_compress"] = bool(lp >= threshold)
         except Exception:  # noqa: BLE001
             pass
     return status
+
+# ============================================================================
+# 压缩历史（内存级，keyed by cid；示例应用足够，重启清空）
+# ============================================================================
+_HISTORY: dict[str, list] = {}
+_HISTORY_MAX = 50
+
+
+def record_compression(cid, *, original_count, compressed_count, reason="") -> None:
+    """记录一次压缩事件，供前端「压缩历史」展示。"""
+    import time
+    _HISTORY.setdefault(cid, []).append({
+        "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "original_count": original_count,
+        "compressed_count": compressed_count,
+        "saved": max(0, original_count - compressed_count),
+        "reason": reason,
+    })
+    if len(_HISTORY[cid]) > _HISTORY_MAX:
+        _HISTORY[cid] = _HISTORY[cid][-_HISTORY_MAX:]
+
+
+def get_compression_history(cid) -> list:
+    """取某会话的压缩历史（最近 N 条，按时间倒序）。"""
+    return list(reversed(_HISTORY.get(cid, [])))

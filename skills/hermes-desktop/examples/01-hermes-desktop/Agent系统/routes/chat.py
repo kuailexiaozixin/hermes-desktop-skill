@@ -851,8 +851,24 @@ async def api_ctx_compress(req):
         sessions.set_messages(cid, compressed)
     except Exception as e:  # noqa: BLE001
         return JSONResponse(_err(f"写回压缩结果失败：{e}"), status_code=500)
+    # 压缩写回成功后，记录压缩历史
+    try:
+        import context_provider as _cp
+        _cp.record_compression(cid, original_count=len(msgs),
+                               compressed_count=len(compressed), reason="主动压缩")
+    except Exception:  # noqa: BLE001
+        pass
     return _ok(conv_id=cid, compressed=True,
                original_count=len(msgs), compressed_count=len(compressed))
+
+@app.get("/api/context/history")
+def api_ctx_history(conv_id: str = ""):
+    """取某会话的压缩历史（内存级）。"""
+    import context_provider as cp
+    try:
+        return _ok(history=cp.get_compression_history(conv_id))
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(_err(f"获取压缩历史失败：{e}"), status_code=500)
 
 
 @app.post("/api/chat")
