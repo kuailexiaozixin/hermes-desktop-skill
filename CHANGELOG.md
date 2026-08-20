@@ -1,4 +1,61 @@
 # CHANGELOG
+## [1.7.31] — 2026-08-19
+
+- **00-index §1.1 检索地图补登 3 项官方既有能力（只索引、不转录，防漂移）**：
+  - **Tool Search**：MCP/插件工具的 agent 级渐进披露（`tool_search`/`tool_describe`/`tool_call` 三桥接工具、分层披露、内置核心工具从不延迟）；进程内直跑路线可用，内置 57 工具集的减法原则归属不变（`03` §1）。
+  - **Delegation / Kanban worker lanes**：进程内子 Agent 委托经 `delegation` 工具集（已在 `03` §2 基线内）+ `Configuration › Delegation` 覆配（模型/并发/深度/worktree 隔离）；Kanban worker lanes 为跨进程持久工作队列形态。
+  - **A2A (Agent-to-Agent)**：入站（Agent Card / JSON-RPC / SSE / push notifications）走网关路线，归属 `16-gateway-package.md`；出站 `a2a` 工具集官方文档标注各进程类型可用，但不在 0.19.0 基线 57 工具集表内——用前先核实实装版本 `TOOLSETS` 注册情况。
+  - 配套：§1.3「不适用」速记补 `A2A 入站` 关键词；§5 单真相源映射表补「A2A / Delegation / Tool Search 能力语义」归属行（归官方 llms-full 章节，后续新增专题 reference 先迁归属）。
+  - 背景：外部归档对比报告（`D:\WPS灵犀过程文件\pydantic-ai与hermes-desktop技能对比及完善建议.md`）P0 索引补全项；官方 A2A/Tool Search 章节于 [1.7.25] 文档更新时已入库，本次补登检索索引。
+  - 纯文档（索引）改动，无 Python/JS 变更。
+- SKILL version 1.7.30 → 1.7.31。
+
+- **修复示例 EXE 进程递归崩溃（严重）**：`examples/01-hermes-desktop/连接系统/main.py` 与 `Agent系统/launcher.py`
+  增加三层守卫——① 代码执行沙箱子进程（`HERMES_RPC_SOCKET`，在本进程执行脚本后退出）；② `.py` 脚本子进程
+  （`frozen + argv[1] 为 .py` 但无 RPC 标记 → 直接退出）；③ `RD_MAIN_PID` 递归/多实例熔断器。
+  防止 EXE 打包后 Hermes 内核 `execute_code` 用 `sys.executable` 递归派生，导致进程指数增长（3→191）、
+  内存耗尽、系统濒临崩溃。验证：frozen 模式四场景（脚本子进程/沙箱/熔断/主实例）全部通过。
+
+## [1.7.30] — 2026-08-17
+
+- **三系统解耦架构（高内聚低耦合工程级落地）全量融入**（L1-L5，见 `references/18-tristructure-architecture.md`）：
+  - **L1 理念文档**：新增 `references/18-tristructure-architecture.md`——三系统（业务/连接/Agent）拆分 + 两层高内聚低耦合（系统间依赖铁律 `业务→连接→Agent` + 系统内部模块内聚），含决策判据、落地步骤、底座三步替换法、验证门禁、反模式红线。
+  - **L2 决策引导**：SKILL.md §5 主流程新增「⓪ 架构形态决策」步骤（单工程内嵌默认 / 三系统分离判据）；§8 扩充「高内聚低耦合（工程组织 + 模块设计两层）」原则（含系统内部模块：单一职责/模块分层/共享抽取/死代码清理）。
+  - **L3 示例骨架**：在 `examples/01-hermes-desktop` 基础上搭建三系统骨架（不新增 04）——`业务系统/`（纯业务 app.py + 启动.bat + README）、`连接系统/`（bridge.fuse_business_into_agent + main.py + README）、`替换Agent系统.md`（底座三步替换法）；01 根 README 新增「三系统组织」说明。
+  - **L4 原则铁律**：依赖方向 / 底座零差异可替换 / 连接唯一装配点 / 系统内部模块内聚，落进 §8。
+  - **L5 门禁清单**：新增 `scripts/verify_tristructure.py` 三系统验证门禁（业务纯净 / 连接唯一装配点 / 独立入口 / 底座纯净；未启用三系统则 SKIP）；`docs/delivery-checklist.md` 新增 A2 三系统交付验收项；SKILL.md 登记 18 号文档入 MOC C 类 + 门禁脚本表。
+  - SKILL version 1.7.29 → 1.7.30。
+
+## [1.7.29] — 2026-08-16
+
+- **00-index 融合「系统架构基线」进 §4 事实基线（顶层地图）**：
+  - 在 §4 事实基线新增「系统架构基线（顶层地图）」子块（与「自进化学习循环」并列）：分层主干（Entry Points → AIAgent 统一内核 → Session Storage / Tool Backends）、核心数据流、工具发现依赖链（import 时自注册）、6 条设计原则，并归属导航到各模块清单（`10`/`12`/`13`/`14`/`16`）。
+  - 未新增独立章节、未新建文件；剔除与 `14` §3「Library 全貌收口」重复的子系统归属表，单真相源映射表补充「系统架构基线 = 00-index §4」归属行。
+  - 内容源自官方架构页（System Overview / Directory Structure / Data Flow / Major Subsystems），以进程内视角精炼，不重复模块清单。
+- SKILL version 1.7.28 → 1.7.29。
+
+## [1.7.28] — 2026-08-16
+
+- **删除 `references/18-self-improvement.md`，自进化理念精炼融入 `00-index.md`（不留痕迹）**：
+  - `00-index.md` §2 定位新增「Hermes 的根性」一句：内置自进化学习循环（self-improving agent / "The agent that grows with you"），决定集成姿态为「会积累的数字同事」而非无状态 API。
+  - `00-index.md` §4 事实基线新增「自进化学习循环（根性机制基线）」，精炼陈述后台 self-improvement review（fork 独立 AIAgent / 独立 prompt cache）、冻结快照注入、consent-aware 写审批、不可变核心等机制基线，并归属 `memory`/`skill_manage` API（`01`/`13`）、能力语义（`08`）、GUI 落地（`02`），避免重复。
+  - `SKILL.md` 清理对 18 的两处引用（MOC 总览 A 聚类主导节点 + A 核心 API 表行），自进化入口改由 `00-index.md` §4 承担。
+  - 说明：CHANGELOG 历史条目中提及 18 的变更事实保留不动（版本审计）。
+- SKILL version 1.7.27 → 1.7.28。
+
+## [1.7.27] — 2026-08-16
+
+- **聚焦 hermes 自身，移除全部与 pydantic-ai 的能力对标内容**（此类对比后续单独归档，不再混入技能文档）：
+  - `references/00-index.md` 删除 §8「与同类框架（pydantic-ai 等）能力对标速查表」。
+  - `references/02-integration-core.md` 移除「等价 pydantic-ai 依赖注入 + 类型化 Output」表述，改为纯 hermes 描述。
+  - `references/09-integration-e2e.md` §8/§9 移除与 pydantic_evals、pydantic-ai 测试替身 model 的对比表述。
+  - `references/13-agent-modules.md` §2.2 移除「对标 pydantic-ai Embeddings」表述。
+  - 说明：CHANGELOG 既有历史条目（记录过去对标 pydantic-ai 的变更事实）保留不动，以维护版本审计与 version 联动门禁。
+- **llms-full 检索地图上移至 `00-index.md` §1（最优先）**：完整版自 `references/10-hermes-cli.md` §5 移入 `00-index.md` §1，
+  `10-hermes-cli.md` §5 改为指向 `00-index.md` §1 的指引，避免重复与漂移；更新 §5 单真相源映射表（新增 llms-full 检索地图归属行）。
+- 重排 `00-index.md` 章节编号：检索地图 §1 → 定位 §2 → 阅读顺序 §3 → 事实基线 §4 → 单真相源 §5 → 交叉引用 §6 → 参考实现 §7。
+- SKILL version 1.7.26 → 1.7.27。
+
 
 ## [1.7.26] — 2026-08-16
 
