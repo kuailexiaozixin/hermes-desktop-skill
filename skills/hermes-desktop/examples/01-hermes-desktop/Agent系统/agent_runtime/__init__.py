@@ -28,5 +28,7 @@ Library」的完整桥接能力，**不绑定任何业务**。未来项目复制
 
 from ._tools import (MAX_TOOL_OUTPUT, DISABLED_TOOLSETS, AUTOMATION_TOOLSETS, DANGEROUS_TOOLSETS, ensure_automation_defaults, register_pure_python_tools, SYSTEM_PROMPT)
 from ._chat import (build_agent, build_trial_agent, stream_agent_chat, runtime_ready)
-from ._toolsets import (TOOLSET_RUNTIME_HINTS, TOOLSET_LABELS, TOOLSET_CATEGORIES, ENV_REQUIRED, get_toolset_matrix, invalidate_toolset_cache, discover_toolsets, configure_toolset, test_toolset, set_toolset_disabled, execute_approved_command, extract_approval)
+from ._toolsets import (TOOLSET_RUNTIME_HINTS, TOOLSET_LABELS, TOOLSET_CATEGORIES, ENV_REQUIRED, get_toolset_matrix, invalidate_toolset_cache, discover_toolsets, configure_toolset, test_toolset, set_toolset_disabled, set_toolset_profile, execute_approved_command, extract_approval)
+# Spec 表（工具集元数据单一事实源，方案 A 重构引入）
+from ._toolset_specs import (TOOLSET_SPECS, CATEGORY_ORDER, get_spec, build_trial_force, build_trial_prompt)
 

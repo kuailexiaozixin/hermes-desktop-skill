@@ -698,3 +698,34 @@ async def api_plugin_install_deps(req):
         return _err("pip 安装失败：" + (proc.stderr or proc.stdout or "")[-800:])
     _PLUGINS_CACHE["data"] = None  # 失效缓存，pip_missing 立即反映
     return _ok(ok=True, installed=deps, output=(proc.stdout or "")[-500:])
+
+
+# ---------------------------------------------------------------------------
+# Loop 预算设置（max_iterations）—— 方案 D 内聚修正：由 routes/toolsets.py 迁入。
+# 与工具集无关，属循环/迭代预算域；前端无调用方时该端点仍对宿主系统开放。
+# ---------------------------------------------------------------------------
+@app.get("/api/settings/loop")
+async def api_get_loop():
+    """获取当前 Loop 设置（max_iterations）。"""
+    home = hc.get_hermes_home()
+    cfg = hc.read_config_yaml(home)
+    agent = cfg.get("agent", {}) or {}
+    loop = agent.get("loop", {}) or {}
+    mi = loop.get("max_iterations", 90)
+    return _ok(max_iterations=mi)
+
+
+@app.post("/api/settings/loop")
+async def api_save_loop(req):
+    """保存 Loop 设置（max_iterations）。"""
+    body = await req.json()
+    mi = int(body.get("max_iterations", 90))
+    mi = max(1, min(200, mi))  # 限制范围 1-200
+    home = hc.get_hermes_home()
+    cfg = hc.read_config_yaml(home)
+    agent = cfg.get("agent", {}) or {}
+    agent.setdefault("loop", {})["max_iterations"] = mi
+    hc.update_config_yaml(home, {"agent": agent})
+    # 注入环境变量（_os 为本文件顶部 import os 的别名）
+    _os.environ["HERMES_MAX_ITERATIONS"] = str(mi)
+    return _ok(message=f"Loop max_iterations 已设为 {mi}", max_iterations=mi)

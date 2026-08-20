@@ -188,6 +188,7 @@ export async function renderToolsCatalogPanel(body) {
       return;
     }
     _data = d;
+    window.__toolsCatalogCache = d;  // 与工具管理面板「工具明细」共享缓存
     _renderStats(d);
     // 填充工具集下拉
     tsSel.innerHTML = "";

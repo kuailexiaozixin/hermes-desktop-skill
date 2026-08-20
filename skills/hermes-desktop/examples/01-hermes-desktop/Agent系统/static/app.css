@@ -1490,3 +1490,38 @@ a.wl:hover { background: rgba(97,175,239,.15); }
 .toolcat-param-type { color: #8250df; }
 .toolcat-param-desc { color: var(--muted, #6b7280); }
 .log-line { display: block; }
+
+/* ── 工具管理 · 三层渐进披露（方案 B 重构） ── */
+/* 第一层：分类折叠组 */
+.tools-group { border: 1px solid var(--border, #e5e7eb); border-radius: 10px; margin-bottom: 10px; overflow: hidden; background: var(--bg-1, #fff); }
+.tools-group-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer;
+  background: var(--bg-2, #f6f7f9); font-size: 13px; font-weight: 600; color: var(--text, #1f2430); user-select: none; }
+.tools-group-head:hover { background: var(--accent-soft, #eef2ff); }
+.tools-group-head .gg-summary { color: var(--muted, #6b7280); font-weight: 400; font-size: 12px; }
+.tools-group-head .gg-chev { margin-left: auto; color: var(--muted, #6b7280); transition: transform .15s; }
+.tools-group.closed .gg-chev { transform: rotate(-90deg); }
+.tools-group.closed .tools-group-body { display: none; }
+.tools-group-body { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+/* 搜索激活时强制展开组体，保证命中结果可见 */
+.tools-searching .tools-group.closed .tools-group-body { display: flex; }
+/* 第二层：卡片徽标与动作 */
+.card-row .badge.state { white-space: nowrap; }
+.cr-actions { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.cr-actions-overflow { position: relative; display: inline-block; }
+.cr-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 60; min-width: 118px; display: none;
+  background: var(--bg-1, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.14); padding: 4px; }
+.cr-menu.open { display: block; }
+.cr-menu button { display: block; width: 100%; text-align: left; padding: 7px 10px; font-size: 12.5px;
+  background: none; border: none; border-radius: 6px; cursor: pointer; color: var(--text, #1f2430); }
+.cr-menu button:hover { background: var(--bg-2, #f1f2f4); }
+/* 第三层：工具明细（只读展开区） */
+.tool-expander { font-size: 12px; color: var(--accent, #4f46e5); cursor: pointer; margin-top: 6px; user-select: none; display: inline-block; }
+.tool-expander:hover { text-decoration: underline; }
+.cr-tools { margin-top: 8px; padding: 8px 10px; background: var(--bg-2, #f6f7f9); border-radius: 8px; display: none; }
+.cr-tools.open { display: block; }
+.cr-tools-row { display: flex; align-items: baseline; gap: 8px; font-size: 12px; padding: 3px 0; flex-wrap: wrap; }
+.cr-tools-row .tname { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text, #1f2430); }
+.cr-tools-row .tdesc { flex: 1; min-width: 140px; }
+/* 场景预设下拉 */
+.tool-profile-select { flex: 0 0 auto; max-width: 180px; }
