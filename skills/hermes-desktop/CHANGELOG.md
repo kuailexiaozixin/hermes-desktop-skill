@@ -1,4 +1,21 @@
 # CHANGELOG
+## [1.8.0] — 2026-08-30
+
+- **架构分层铁律（Agent系统-连接系统-业务系统）强化**：SKILL.md §8 新增"架构分层铁律"章节，明确三系统单向依赖、业务系统禁 `import` Agent 模块、连接系统唯一装配点；强调模块化、关注点分离、高内聚低耦合。
+- 强化 `references/18-tristructure-architecture.md` 与 `references/00-index.md` 检索映射，统一三系统架构表达。
+- SKILL version 1.7.31 → 1.8.0。
+
+## [1.7.31] — 2026-08-19
+
+- **00-index §1.1 检索地图补登 3 项官方既有能力（只索引、不转录，防漂移）**：
+  - **Tool Search**：MCP/插件工具的 agent 级渐进披露（`tool_search`/`tool_describe`/`tool_call` 三桥接工具、分层披露、内置核心工具从不延迟）；进程内直跑路线可用，内置 57 工具集的减法原则归属不变（`03` §1）。
+  - **Delegation / Kanban worker lanes**：进程内子 Agent 委托经 `delegation` 工具集（已在 `03` §2 基线内）+ `Configuration › Delegation` 覆配（模型/并发/深度/worktree 隔离）；Kanban worker lanes 为跨进程持久工作队列形态。
+  - **A2A (Agent-to-Agent)**：入站（Agent Card / JSON-RPC / SSE / push notifications）走网关路线，归属 `16-gateway-package.md`；出站 `a2a` 工具集官方文档标注各进程类型可用，但不在 0.19.0 基线 57 工具集表内——用前先核实实装版本 `TOOLSETS` 注册情况。
+  - 配套：§1.3「不适用」速记补 `A2A 入站` 关键词；§5 单真相源映射表补「A2A / Delegation / Tool Search 能力语义」归属行（归官方 llms-full 章节，后续新增专题 reference 先迁归属）。
+  - 背景：外部归档对比报告（`D:\WPS灵犀过程文件\pydantic-ai与hermes-desktop技能对比及完善建议.md`）P0 索引补全项；官方 A2A/Tool Search 章节于 [1.7.25] 文档更新时已入库，本次补登检索索引。
+  - 纯文档（索引）改动，无 Python/JS 变更。
+- SKILL version 1.7.30 → 1.7.31。
+
 ## [1.7.30] — 2026-08-17
 
 - **三系统解耦架构（高内聚低耦合工程级落地）全量融入**（L1-L5，见 `references/18-tristructure-architecture.md`）：

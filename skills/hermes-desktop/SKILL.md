@@ -7,7 +7,7 @@ description: >-
   触发词：hermes、hermes-agent、AIAgent、run_agent、给应用加 AI、内嵌 Agent、桌面 AI 对话、业务系统对接智能体、
   GUI 集成 Agent、进程内 agent、在应用里对接 AI、AI 对话面板、工具调用可视化。
   反触发（一般不用）：不涉及对接/集成 hermes 内核的纯脚本调用、仅用 hermes CLI 无需集成、Hermes 官方服务端部署运维。
-version: "1.7.31"
+version: "1.8.0"
 author: agent
 agent_created: true
 platform: multi
@@ -310,6 +310,25 @@ when_to_use: >-
 ---
 
 ## §8 代码与结构原则（仅本技能相关）
+
+### 架构分层铁律（Agent系统-连接系统-业务系统）
+
+集成 Hermes 时，按 **Agent系统 → 连接系统 → 业务系统** 三系统解耦，依赖方向**单向**，业务系统**禁止直接 `import` Agent 模块**：
+
+```
+业务系统（纯业务逻辑 + UI）
+    │  只暴露纯业务接口：build_app() / mount_rd_routes() / get_business_snapshot()
+    ▼
+连接系统（纯桥接，唯一装配点）
+    │  fuse_business_into_agent()：挂业务路由、注册工具、注入快照、安装技能
+    ▼
+Agent系统（纯净 Hermes 底座 = 上游 examples/01 零差异）
+```
+
+- **模块化**：按功能域拆包（路由 / 服务 / 桥接 / 数据 / 工具），每个系统内部再按单一职责分层，不跨层调用。
+- **关注点分离**：业务逻辑与 Agent 底座彻底解耦，桥接逻辑（callback→queue）独立成层，GUI 层不直接触碰 Agent 内核。
+- **高内聚低耦合**：三系统间仅经显式函数接口协作（业务系统暴露纯业务接口、连接系统暴露装配接口、Agent系统暴露底座接口）；公共辅助抽 `_utils.py` 消除 copy-paste；死代码一律清理。
+- 完整三系统架构、落地步骤与验证门禁见 `references/18-tristructure-architecture.md`。
 
 * Agent 集成代码独立成模块（如 `agent_runtime.py`），不要塞进路由文件。
 * 分层：GUI 层 / 桥接层（callback→queue）/ Agent 构造层 / 工具层，四层不混。

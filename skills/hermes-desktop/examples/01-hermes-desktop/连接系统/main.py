@@ -18,7 +18,7 @@ for _d in (_base, _base / "业务系统", _base / "连接系统"):
 # ── onefile 冻结模式：代码执行沙箱子进程分流 + 递归防护 ──
 # Hermes 内核 tools.code_execution_tool 用 ``subprocess.Popen([sys.executable, script.py])``
 # 派生沙箱子进程；冻结后 sys.executable 就是 EXE 本身，若不加守卫，子进程会重新走
-# 启动逻辑拉起第二个 HTTP 服务并卡死（实测 EXE 启动后进程 3→191 指数增长、内存耗尽、
+# start() 拉起第二个 HTTP 服务并卡死（实测 EXE 启动后进程 3→191 指数增长、内存耗尽、
 # 系统濒临崩溃）。此处统一拦截所有「把 EXE 当作 python 派生的 .py 子进程」以及
 # 「继承环境的递归子进程」。
 #
@@ -46,7 +46,7 @@ if getattr(sys, "frozen", False) and len(sys.argv) >= 2 and os.path.isfile(sys.a
 # ── onefile 冻结模式：递归/多实例熔断器 ───────────────────────────
 # 若 EXE 在某条未识别链路中被当作解释器反复派生，这些子进程会继承 RD_MAIN_PID
 # 环境变量；RD_MAIN_PID 存在且不等于当前进程，说明本进程是递归/重复派生的子进程，
-# 直接退出，避免再次进入启动逻辑造成进程爆炸。
+# 直接退出，避免再次进入 start() 造成进程爆炸。
 # 注：execute_code 沙箱子进程的环境会被 _scrub_child_env 清掉 RD_MAIN_PID，因此
 # 不会被本熔断器误伤（其已被上方守卫 1 拦截）。
 if getattr(sys, "frozen", False):

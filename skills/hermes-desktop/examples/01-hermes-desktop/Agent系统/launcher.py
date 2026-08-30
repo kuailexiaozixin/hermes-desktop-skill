@@ -118,13 +118,13 @@ def _bootstrap_venv() -> None:
 
 _bootstrap_venv()
 
-# ── onefile 冻结模式：代码执行沙箱子进程分流 + 递归防护 ──
+# ============================================================================
+# onefile 冻结模式：代码执行沙箱子进程分流 + 递归防护
 # Hermes 内核 tools.code_execution_tool 用 ``subprocess.Popen([sys.executable, script.py])``
-# 派生沙箱子进程；冻结后 sys.executable 就是 EXE 本身，若不加守卫，子进程会重新走
-# 启动逻辑拉起第二个 HTTP 服务并卡死（实测 EXE 启动后进程 3→191 指数增长、内存耗尽、
-# 系统濒临崩溃）。此处统一拦截所有「把 EXE 当作 python 派生的 .py 子进程」以及
-# 「继承环境的递归子进程」。
-#
+# 派生沙箱子进程；冻结后 sys.executable 就是 EXE 本身，若不加守卫，子进程会重新执行
+# 本入口拉起第二个 HTTP 服务/窗口并卡死（实测进程 3→191 指数增长、内存耗尽、系统濒临
+# 崩溃）。此处统一拦截所有「把 EXE 当作 python 派生的 .py 子进程」以及「继承环境的递归子进程」。
+# ============================================================================
 # 1) 代码执行沙箱子进程（HERMES_RPC_SOCKET 场景）：在本进程内直接执行该脚本后退出，
 #    让父进程的 execute_code 正常收回 stdout/stderr。
 if getattr(sys, "frozen", False) and len(sys.argv) >= 2 and os.path.isfile(sys.argv[1]):

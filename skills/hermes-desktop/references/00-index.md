@@ -20,6 +20,8 @@
 | 确认 `AIAgent` 概念 / 进程内 Library 模式 | `Using Hermes as a Python Library` / `run_conversation()` | ✅ 核心（详见 `01`） |
 | 模型 / Provider / key 配置 | `Configuration` › `Configure a model` / `base_url` / `api_key` | ✅ |
 | Toolset 启用 / 自定义注册 | `Tools & Toolsets` / `ctx.register_tool` | ✅ 概念看这里，进程内注册落地见 `01`/`03` |
+| 工具按需加载 / 渐进披露（MCP 工具多） | `Tool Search` / `tool_search` | ✅ 进程内可用：MCP/插件工具的 agent 级渐进披露（内置核心工具从不延迟）；内置 57 工具集的减法原则仍归 `03` §1 |
+| 子 Agent 委托 / 多 Agent 任务分解 | `Configuration` › `Delegation`（`delegate_task`）/ `Kanban worker lanes` | ✅ 进程内可用：`delegation` 工具集在 `03` 基线内（模型/并发/深度覆配）；Kanban 为跨进程持久工作队列 |
 | 回调触发时机 | `## Callback Surfaces` / `reasoning_callback` | ✅ 时机看这里，实证签名看 `01` |
 | 多轮会话 / 持久化 | `Sessions` › `Session Storage` / `session_id` | ✅ |
 | MCP toolset 接入 | `MCP Servers` | ⚠️ 可用，进程内接法以源码为准（见 `06` §6） |
@@ -29,6 +31,7 @@
 | CLI / TUI 用法 | `CLI Interface` / `TUI` | ⚠️ 进程内调 CLI 逻辑见 `10-hermes-cli.md` §3 |
 | **API Server `/v1`** | `API Server` | ⚠️ 进程内直跑路线不适用（选 API Server 路线则按需，见 `15-api-server.md`） |
 | gateway / sidecar | `Gateway` / `Container Architecture` | ❌ 进程内直跑路线不适用（选网关路线则按需，见 `16-gateway-package.md`） |
+| Agent 间通信（A2A 协议） | `A2A (Agent-to-Agent)`（user-guide/messaging/a2a） | ⚠️ 入站（Agent Card / JSON-RPC / SSE）需网关路线（见 `16-gateway-package.md`）；出站 `a2a` 工具集不在 0.19.0 基线 57 工具集表内，用前先核实实装版本 `TOOLSETS` 是否已注册 |
 | Managed Mode / Docker 部署 | `Managed Mode` / `Docker` | ❌ 进程内直跑路线不适用（属跨进程部署，按需求选对应路线，见 `15-api-server.md`/`16-gateway-package.md`） |
 | 官方 Desktop（Electron） | `apps/desktop`（仓库内，不在文档） | ❌ 路线定位不同（差异见 `04-rendering-frameworks.md` §16） |
 | 消息平台（Telegram/Slack…） | `Integrations` / 各平台 adapter | ❌ 进程内直跑路线需改选网关路线才激活（见 `02` §5；选网关路线则按需，见 `16-gateway-package.md`） |
@@ -44,7 +47,7 @@
 
 遇到以下关键词，提醒自己：**这是进程内直跑路线下的不适用项**；若确定选网关 / API Server / `/v1` 路线（见 `15-api-server.md`/`16-gateway-package.md`）则按需启用——选进程内直跑路线时请停下核对：
 `API_SERVER_KEY` · `CORS` · `127.0.0.1:8642` · `hermes gateway` · `/v1/chat/completions` ·
-`Dockerfile` · `Managed Mode` · 官方 `apps/desktop` · Telegram/Slack 平台 adapter。
+`Dockerfile` · `Managed Mode` · 官方 `apps/desktop` · Telegram/Slack 平台 adapter · A2A 入站（`A2A_HOST`/`A2A_PORT`）。
 
 ---
 
@@ -150,6 +153,7 @@ CLI 包      : hermes_cli  ( __version__ = "0.19.0" )  # 含 147 个顶层模块
 | API Server 路线落地 | `15-api-server.md` | API Server 形态单一真相源（配置/端点/接入/进程内自建），避免与 02/04/10 重复 |
 | `gateway` 包全量子模块 | `16-gateway-package.md` | 77 个嵌套子模块不遗漏、不重复、不交叉 |
 | 非侵入扩展面（skill/mcp/plugin/memory） | `02-integration-core.md` §9–§14 | 业务对接 Hermes 的唯一扩展面参考（已并入双向整合总章）；改核为最后手段 |
+| A2A / Delegation / Tool Search 能力语义 | `hermes-llms-full.txt` 对应章节（本文 §1.1 索引） | 本技能仅索引不重复转录；后续如新增专题 reference，先更新本表归属 |
 
 ---
 
