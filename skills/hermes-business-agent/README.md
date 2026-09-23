@@ -2,9 +2,9 @@
 
 > 用途：把 Agent 接进真实业务流程，或从零开发 Agent 驱动的业务系统。形态不限——桌面 EXE、本地服务、常驻后端都可以；本技能给出的是一条"定业务 → 定形态 → 跑通内核 → 接界面 → 赋业务 → 立闸门 → 取证 → 交付"的工作流，加一整套经源码核实的参考实现与事实库。
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](skills/hermes-business-agent/LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Skill: hermes-business-agent](https://img.shields.io/badge/Skill-hermes--business--agent-blue)](#)
-[![Python](https://img.shields.io/badge/Python-3.11%20%E2%80%93%203.13-blue)](skills/hermes-business-agent/references/05-install-and-env.md)
+[![Python](https://img.shields.io/badge/Python-3.11%20%E2%80%93%203.13-blue)](references/05-install-and-env.md)
 
 这是一份可独立阅读的 Hermes Agent 业务集成技能与技术手册。版本号只记在一处：`SKILL.md` 的 frontmatter 与 `CHANGELOG.md` 顶部，本文不复述。
 
@@ -30,28 +30,27 @@ cd examples/01-hermes-desktop/连接系统 && python main.py     # 融合模式 
 ## 目录结构
 
 ```
-hermes-desktop-skill/　# GitHub 仓库根
-└── skills/hermes-business-agent/　# 本技能，即 gh skill install 安装的那一份
-    ├── SKILL.md                 # 唯一工作流主线（入场检查 + 八步 + 回路）与 frontmatter 版本号
-    ├── CHANGELOG.md             # 版本历史
-    ├── hermes-llms-full.txt     # Hermes 官方文档全文（语义权威源）
-    ├── references/              # 22 篇参考文档 + api-reference/（自动生成 API 参考）
-    ├── examples/                # 3 个参考实现（01 三系统底座 / 02 多智能体 / 03 官方 WebUI）
-    ├── scripts/                 # 质量门禁与上游跟踪脚本
-    ├── docs/                    # glossary.md 术语表 · troubleshooting.md 排障沉淀 · delivery-checklist.md 交付清单
-    └── templates/               # 最小骨架模板
+hermes-business-agent-skill/
+├── SKILL.md                 # 唯一工作流主线（入场检查 + 八步 + 回路）与 frontmatter 版本号
+├── CHANGELOG.md             # 版本历史
+├── hermes-llms-full.txt     # Hermes 官方文档全文（语义权威源）
+├── references/              # 22 篇参考文档 + api-reference/（自动生成 API 参考）
+├── examples/                # 3 个参考实现（01 三系统底座 / 02 多智能体 / 03 官方 WebUI）
+├── scripts/                 # 质量门禁与上游跟踪脚本
+├── docs/                    # glossary.md 术语表 · troubleshooting.md 排障沉淀 · delivery-checklist.md 交付清单
+└── templates/               # 最小骨架模板
 ```
 
 ## 该读哪一篇
 
 主题导航与「第 N 步该读哪几篇」的反查索引只有一处：
-[`references/00-index.md`](skills/hermes-business-agent/references/00-index.md) §3（按主线步骤）与 §1（按官方文档检索）。本文不重复列一遍——那份表会随文档增删漂移，这张表就不会。
+[`references/00-index.md`](references/00-index.md) §3（按主线步骤）与 §1（按官方文档检索）。本文不重复列一遍——那份表会随文档增删漂移，这张表就不会。
 
 ## 设计理念
 
 Hermes Agent 的根性是解决「AI 失忆症」：内置学习循环从经验沉淀记忆与技能、consent-aware 的写审批、运行越久越强。
-机制基线与其对集成的含义见 [`references/00-index.md`](skills/hermes-business-agent/references/00-index.md) §2 与 §4。
+机制基线与其对集成的含义见 [`references/00-index.md`](references/00-index.md) §2 与 §4。
 
 ## 许可证
 
-[MIT](skills/hermes-business-agent/LICENSE) © 2026 kuailexiaozixin。各示例独立 MIT 授权（见各目录 `LICENSE`）。
+[MIT](LICENSE) © 2026 kuailexiaozixin。各示例独立 MIT 授权（见各目录 `LICENSE`）。
