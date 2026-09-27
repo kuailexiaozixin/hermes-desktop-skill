@@ -34,7 +34,7 @@ import hermes_agent                        # ModuleNotFoundError: hermes_agent
 | `tools/delegate_tool.py` | `TOOLSETS` 注册表（57 项，见 `03` §1；`from tools.delegate_tool import TOOLSETS`） |
 | `tools/` | 各工具实现（`file_tools`、`browser_tool`、`terminal_tool` …） |
 | `agent/` | 运行时（`agent_init`、`tool_executor`、`context_engine`、`moa_loop` …） |
-| `hermes_cli/` | 统一 CLI 包（顶层 146 个模块、含嵌套共 205，两个口径都不含包根 `__init__.py`；子命令 chat/gateway/setup/status/cron/desktop，全量见 `10`） |
+| `hermes_cli/` | 统一 CLI 包（顶层 146 个模块文件 + 3 个子包 = 149 个条目、含嵌套共 205 个 `.py`，两个口径都不含包根 `__init__.py`；子命令 chat/gateway/setup/status/cron/desktop，全量见 `10`） |
 
 ---
 
@@ -56,7 +56,7 @@ agent.close()
 ```
 
 - `chat(message, stream_callback=None) -> str`：单轮，返回最终文本。实现就是 `run_conversation()` 后取
-  `result["final_response"]`（`run_agent.py:6407-6420`），因此**它无法区分成功答复与失败说明**——见 §2.1 口径 2。
+  `result["final_response"]`（`run_agent.py` 的 `AIAgent.chat()`，末行即 `return result["final_response"]`），因此**它无法区分成功答复与失败说明**——见 §2.1 口径 2。
 - `run_conversation(user_message, system_message=None, conversation_history=None, task_id=None,
   stream_callback=None, persist_user_message=None, persist_user_timestamp=None, moa_config=None) -> dict`：
   多轮接管与结构化取数的入口，返回形状见 §2.1。`persist_*` 是"只改落盘、不改发给模型的那一份"：
@@ -67,21 +67,21 @@ agent.close()
 
 **同一函数有两套键集不同的字典**，这是调用方最容易踩的一条，所以逐项列全。
 
-**A · 正常走完一轮**——由 `agent/turn_finalizer.py:516-549` 组装，28 个固定键 + 4 个条件键：
+**A · 正常走完一轮**——由 `agent/turn_finalizer.py` 的 `finalize_turn()` 组装，28 个固定键 + 4 个条件键：
 
 | 组 | 键 | 含义 |
 | --- | --- | --- |
 | 结论与转录 | `final_response` | 最终文本；被中断时是中断说明文字 |
-| | `last_reasoning` | 本轮最近一条 assistant 消息的推理段；遇到 `user` 角色即停，不回溯到上一轮（`turn_finalizer.py:507-513`） |
+| | `last_reasoning` | 本轮最近一条 assistant 消息的推理段；遇到 `user` 角色即停，不回溯到上一轮（同函数内 `last_reasoning = None` 起那一段） |
 | | `messages` | 本轮完整转录，可直接作为下一轮的 `conversation_history` |
 | | `api_calls` | 本轮实际发出的模型请求次数 |
 | 终态标志 | `completed` / `failed` / `interrupted` | 三个布尔标志，含义见下方口径 1、2 |
-| | `partial` | 只在"因工具调用非法而停"时为 `True`（`turn_finalizer.py:524`） |
+| | `partial` | 只在"因工具调用非法而停"时为 `True`（同文件 `"partial": False,  # True only when stopped due to invalid tool calls` 一行） |
 | | `turn_exit_reason` | 本轮结束原因（字符串），用于日志与失败归因 |
 | | `response_transformed` / `response_previewed` | 响应是否被改写 / 是否已被预览过 |
 | 本轮身份 | `model` / `provider` / `base_url` / `session_id` / `service_tier` | 实际生效的模型与端点；`service_tier` 取自 `request_overrides.extra_body` |
 | 计量 | `input_tokens` `output_tokens` `prompt_tokens` `completion_tokens` `total_tokens` `reasoning_tokens` `cache_read_tokens` `cache_write_tokens` `last_prompt_tokens` `estimated_cost_usd` `cost_status` `cost_source` | **会话累计值**（源码取的是 `agent.session_*`，不是一轮的增量）。要单轮或单任务的用量，必须在调用前后各读一次再相减——`21` §6 第 2 条按任务统计 token 就依赖这个差值。`last_prompt_tokens` 来自上下文压缩器，用于判断下次请求的上下文规模 |
-| 条件键 | `guardrail` | 仅当工具护栏决定停机时出现，值为 `ToolGuardrailDecision.to_metadata()`（`turn_finalizer.py:550-551`） |
+| 条件键 | `guardrail` | 仅当工具护栏决定停机时出现，值为 `ToolGuardrailDecision.to_metadata()`（同文件 `if agent._tool_guardrail_halt_decision is not None:` 一处） |
 | | `cleanup_errors` | 仅当轨迹/会话/资源清理抛错时出现——响应照样返回，但不要把它当干净一轮（`:555`） |
 | | `pending_steer` | 末轮之后才到达的 `/steer`，交回调用方作为下一轮用户输入，避免静默丢失（`:560`） |
 | | `interrupt_message` | 仅当 `interrupted` 且中断自带说明文字时出现（`:566`） |
@@ -118,8 +118,8 @@ agent.close()
 | --- | --- | --- |
 | `provider` / `model` | — | 供应商与模型名；`moa` 是虚拟 provider（落地见 `08` §3 MOA） |
 | `base_url` / `api_key` | `None` | 自定义端点/密钥；不传走默认凭证源 |
-| `api_mode` | `None` | `chat` / `responses` 等底层模式 |
-| `max_iterations` | `90` | 单轮最大工具循环次数（与官方文档不一致的说明见 §3.6 第 11 行） |
+| `api_mode` | `None` | 底层协议模式，**合法取值只有五项**：`chat_completions` / `codex_responses` / `anthropic_messages` / `bedrock_converse` / `codex_app_server`（白名单是 `agent/agent_init.py` 的 `init_agent()` 内 `if api_mode in {...}:` 一行；同函数 docstring 只列前两种，以代码为准）。传非白名单值不报错，静默按 `chat_completions` 处理（同函数的 `else` 分支 `agent.api_mode = "chat_completions"`）；`None` 由 provider 决定。想加第六种模式属改核，见 `22` §4.3-A |
+| `max_iterations` | `90` | 一次 `run_conversation()` 内工具循环的最大迭代次数（与官方文档不一致的说明见 §3.6 第 11 行） |
 | `tool_delay` | `1.0` | 工具调用间节流（秒） |
 | `reasoning_config` | `None` | 推理参数（供应商相关） |
 | `max_tokens` | `None` | 响应上限 |
@@ -164,7 +164,7 @@ agent = AIAgent(
 > 中经 `api_kwargs.update(overrides)` **整体并入**底层 provider 请求参数（各 API 路径自行消费 `service_tier` /
 > `speed` / `extra_body` / `response_format` 等键），故它是**自由键字典**——除采样参数外，`response_format`
 > / `extra_body` 也会原样透传给 OpenAI 兼容端点。自定义 provider 的 `extra_body` 可经
-> `_custom_provider_request_overrides`（`runtime_provider.py:917`）透传。
+> `_custom_provider_request_overrides`（`runtime_provider.py` 的同名函数）透传。
 
 ### 3.4bis 结构化输出与多模态输入（两类原生路径）
 
@@ -210,7 +210,7 @@ order = res.parsed   # 已通过 JSON Schema 校验的 dict
 
 **多模态输入——主 Agent（OpenAI 风格消息）**：`run_conversation(user_message: Any)` 接受 OpenAI 风格的
 `content` 列表（含 `image_url` / base64 图像）。`agent/conversation_loop.py` 处理多模态内容列表；当模型
-不支持视觉时，hermes 会**自动剥离图像并以纯文本重试**（`conversation_loop.py:2631` 一带）：
+不支持视觉时，hermes 会**自动剥离图像并以纯文本重试**（`conversation_loop.py` 的 `_perform_api_call()` 内讨论 image_url 4xx 的一带）：
 
 ```python
 result = agent.run_conversation([
@@ -247,7 +247,7 @@ result = agent.run_conversation([
 | 2 | `model` | `""`（空串） | 模型名；空串时由 provider 选默认 |
 | 3 | `base_url` | `None` | 自定义 API 端点；`None` 走 provider 默认 |
 | 4 | `api_key` | `None` | 密钥；`None` 走默认凭证源（环境变量/凭据池） |
-| 5 | `api_mode` | `None` | 底层模式（`chat`/`responses` 等）；`None` 由 provider 决定 |
+| 5 | `api_mode` | `None` | 底层协议模式；`None` 由 provider 决定。取值限 `chat_completions`/`codex_responses`/`anthropic_messages`/`bedrock_converse`/`codex_app_server`（`agent/agent_init.py` 的 `init_agent()` 内 `if api_mode in {...}:` 白名单；非白名单值回落到同函数 `else` 分支的 `chat_completions`） |
 | 6 | `acp_command` | `None` | ACP（Agent Client Protocol）命令入口；进程内直跑路线一般不用 |
 | 7 | `acp_args` | `None` | ACP 命令参数 |
 | 8 | `command` | `None` | 内置 CLI 命令名（如 `chat`/`gateway`）；进程内直跑路线不用 |
@@ -322,7 +322,7 @@ result = agent.run_conversation([
 | 57 | `status_callback` | `None` | 状态条回调 |
 | 58 | `notice_callback` | `None` | 提示回调（带 key） |
 | 59 | `notice_clear_callback` | `None` | 清除提示回调（带 key） |
-| 60 | `event_callback` | `None` | **统一事件总线**（`(event_name, payload)`，`01` §4.1 词汇） |
+| 60 | `event_callback` | `None` | 名义上的**统一事件总线**（`(event_name, payload)`）；0.19.0 实际只发 `session:compress` 一个事件名，界面别依赖它，见 §4.1 |
 
 #### 3.6.7 检查点（Checkpoints）
 | # | 参数 | 默认 | 语义（直译/实测） |
@@ -369,7 +369,7 @@ result = agent.run_conversation([
 `event_callback` 是 16 个 `*_callback` 里唯一带 `(str, dict)` 形状注解的回调
 （`Optional[Callable[[str, dict], NoneType]]`；`reaction_callback` 只带 `(str)`，其余注解为裸 `callable`），
 设计意图是"事件名 + 载荷"的统一出口。**但 0.19.0 内核只经它发一个事件名**：`session:compress`
-（发出点 `agent/conversation_compression.py:1433`、`agent/codex_runtime.py:250`；
+（发出点 `agent/conversation_compression.py` 与 `agent/codex_runtime.py` 两处 `agent.event_callback("session:compress", ...)`；
 `grep -rn 'event_callback("' site-packages/agent` 全量命中仅此两处）。
 禁止把对话增量、工具卡片当成 `event_callback` 发出来的东西——按那种假设写的监听器一轮也收不到。
 
@@ -418,25 +418,25 @@ def build_stream(agent, user_msg):
 `17` 要求测试断言行为证据，而下面四条会让回调安静地不触发或触发形状不符预期，先按规则设计再接线：
 
 1. **工具调用轮不流文本**。流式路径只对"纯文本终答"发增量，工具调用轮抑制文本回调
-   （`agent/chat_completion_helpers.py:2243-2245`）；且进入工具执行前会先冲刷一次显示回调
-   （`agent/conversation_loop.py:5050-5058`）。所以一次带工具往返回界面上"半天没字"是正常形状，
+   （`agent/chat_completion_helpers.py` 的 `interruptible_streaming_api_call()` 内 "Fires stream_delta_callback and _stream_callback for each text token." 一带）；且进入工具执行前会先冲刷一次显示回调
+   （`agent/conversation_loop.py` 的 `_perform_api_call()` 内 "before tool execution begins" 一带）。所以一次带工具往返回界面上"半天没字"是正常形状，
    进度提示要靠 `tool_start_callback` 而不是靠 delta 计数。
 2. **`None` 是收尾哨兵，且只发给构造器那一路**。`stream_delta_callback` 会被显式传入 `None` 表示一段流结束
-   （`conversation_loop.py:5057`、`:5081`）；方法参数 `stream_callback`（内核存为 `agent._stream_callback`，
-   逐轮绑定 `agent/turn_context.py:363`、轮末置 `None` `agent/turn_finalizer.py:573`）**明确不收 `None`**
-   （`conversation_loop.py:5053-5054` 注释）。因此做 `buf += delta` 的回调必须对 `None` 短路，
-   两路不能共用一个不做判空的函数。文本增量本身两路同发（`run_agent.py:5205-5212`）；空串不会触发（`:5202-5203`）。
+   （`conversation_loop.py` 的 `_perform_api_call()` 内两处 `agent.stream_delta_callback(None)`）；方法参数 `stream_callback`（内核存为 `agent._stream_callback`，
+   逐轮绑定 `agent/turn_context.py` 的 `build_turn_context()` 内 `agent._stream_callback = stream_callback`、轮末在 `agent/turn_finalizer.py` 的 `finalize_turn()` 内置 `None`）**明确不收 `None`**
+   （同函数内 "Only signal the display callback — TTS (_stream_callback)" 一带注释）。因此做 `buf += delta` 的回调必须对 `None` 短路，
+   两路不能共用一个不做判空的函数。文本增量本身两路同发（`run_agent.py` 的 `_fire_stream_delta()` 内构造判空 callbacks 那一段）；空串不会触发（同函数内 `if not text: return`）。
 3. **回调里抛异常没有任何信号**。三处触发点全是 `except Exception: pass`
-   （`run_agent.py:4867-4872`、`:5205-5212`，`chat_completion_helpers.py:2837-2841`），
+   （`run_agent.py` 的 `_reset_stream_delivery_tracking()` 与 `_fire_stream_delta()` 两处，`chat_completion_helpers.py` 的 `_call_chat_completions()` 内 `elif agent.stream_delta_callback:` 一带），
    抛异常那一次的文本还不计入内核的已流式记录。症状是"界面少了一段字"而非报错，
    所以回调体只做一件事——把事件塞进队列（§4.2），渲染与拼字符串留在主线程。
 4. **`reasoning_callback` 的触发形状随是否接了流式回调而变**：注册了 `stream_delta_callback` 或本轮传了
    `stream_callback` 时按推理**增量**多次触发；两者都没注册时才在轮末把整段推理一次性发出
-   （`chat_completion_helpers.py:1267-1279` + `run_agent.py:5216-5229`）。同时接 reasoning 与 delta 的界面
+   （`chat_completion_helpers.py` 的 `build_assistant_message()` 内 reasoning 回调一段 + `run_agent.py` 的 `_fire_reasoning_delta()` 整个函数）。同时接 reasoning 与 delta 的界面
    必须按"多段碎片"处理——旗舰示例为此写了分流类（`docs/glossary.md` 的 `_ThinkingSplitter` 行给出其源码位置）。
 5. **流式可能被整会话关掉，且没有任何回调通知你**。`agent._disable_streaming` 只在三处被置 `True`，
    置上之后该实例本次进程内**后续每一轮都不再走流式**：Bedrock 的 IAM 拒了
-   `InvokeModelWithResponseStream`（`agent/chat_completion_helpers.py:2330-2331`）、供应商号称流式却返回
+   `InvokeModelWithResponseStream`（`agent/chat_completion_helpers.py` 的 `_bedrock_call()` 内）、供应商号称流式却返回
    完整响应对象而非迭代器（`:2703-2710`）、流式请求抛出不支持类错误（`:3522-3523`）。三处的通知方式是
    `_safe_print` 一行告警或 `logger.info`，**既无回调也不导出可读属性**——窗口化 EXE 没有控制台，那行告警看不见。
    于是症状是"delta 一次都没来过"而不是报错。另有一条更窄的旁路：`platform == "cron"` 且
@@ -444,7 +444,7 @@ def build_stream(agent, user_msg):
    判据 `should_use_direct_api_call` 在 `:435-447`，注释记明是为 #62151 的嵌套线程池死锁绕行），
    常驻服务里跑 Hermes cron 会命中。因此：接了 delta 的界面必须容忍"全程零 delta"（超时后退回整段渲染），
    进度反馈改依赖 `tool_start_callback` / `step_callback`；配置项 `display.streaming` 是 CLI 专用
-   （`cli.py:3827` 取默认 `false`、`gateway/display_config.py:12` 注明 CLI-only），进程内没有等价开关。
+   （`cli.py` 的 `AIAgent.__init__` 内 `self.streaming_enabled = CLI_CONFIG["display"].get("streaming", False)` 取默认 `false`、`gateway/display_config.py` 顶部的 `Exception` 说明注明 CLI-only），进程内没有等价开关。
 
 
 ---

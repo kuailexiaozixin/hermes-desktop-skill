@@ -57,6 +57,8 @@ EXPECTED = [
     ("references/12-tools-modules.md", True),
     ("references/13-agent-modules.md", True),
     ("references/14-library-infra.md", True),
+    # 跨步：harness 部件表与可改边界三档（第 ②③⑤⑥⑦⑧ 步共用，共用关系由该文件 §7 声明）
+    ("references/22-harness-engineering.md", True),
     # 第 ④ 步：接界面
     ("references/04-rendering-frameworks.md", True),
     ("templates/README.md", False),
@@ -84,6 +86,7 @@ EXPECTED = [
     ("docs/glossary.md", False),
     ("docs/troubleshooting.md", False),
     ("scripts/check_doc_links.py", True),
+    ("scripts/check_module_tables.py", True),     # 模块清单与「规模」声明 ↔ 已装包对账
     ("scripts/release_gate.py", True),
     ("scripts/check_skill_gate.py", True),
     ("scripts/check_api_server.py", True),             # 路线④⑤ 条件门禁
@@ -101,7 +104,7 @@ EXPECTED = [
 # Agent系统/ 是外部底座、__pycache__/api-reference 为产物，均排除。
 REGISTRY_DIRS = [("references", ".md"), ("scripts", ".py"), ("docs", ".md")]
 
-# hermes-llms-full.txt 体积安全范围（当前基线 5,005,104 bytes，唯一真相见 references/docs-baseline.json；低于 1MB 视为下载损坏）
+# hermes-llms-full.txt 体积安全范围（唯一真相见 references/docs-baseline.json，此处不复述当前基线字节数；低于 1MB 视为下载损坏）
 DOCS_MIN_SIZE = 1_000_000
 
 

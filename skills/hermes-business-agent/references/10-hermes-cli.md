@@ -1,13 +1,13 @@
-# 10 · `hermes_cli` 完整参考（Hermes 内置 CLI 包，0.19.0 顶层 146 模块 / 含嵌套共 205，口径均不含包根 `__init__.py`）
+# 10 · `hermes_cli` 完整参考（Hermes 内置 CLI 包，0.19.0 顶层 146 个模块文件 + 3 个子包，含嵌套共 205 个 `.py`；口径均不含包根 `__init__.py`）
 
 > 本文件是 `hermes_cli` 包的**完整、权威、逐模块参考**。
 > `hermes_cli` 是 `hermes-agent==0.19.0` 自带的**统一 CLI 包**（`__version__="0.19.0"`），
 > 也是 Library 的组成部分之一（与 `run_agent`/`tools`/`agent`/`batch_runner` 并列，均为顶层包）。
 > 它的子命令包括 `chat` / `gateway` / `setup` / `status` / `cron` / `mcp` / `bundles` / `project` / `kanban` / `backup` / `doctor` / `plugins` / `portal` 等。
 >
-> 本文经 `hermes-agent==0.19.0` 已装包**逐模块 import + 读取 docstring + 提取顶层 API** 核实；
-> 全部 146 个顶层模块（不含包根 `__init__.py`）无一遗漏，按「不交叉、不重合」的 13 个主题组编排；
-> 含嵌套子模块共 205 个（同一棵树内全部 `.py`，仅扣除包根 `__init__.py`）。
+> 本文经 `hermes-agent==0.19.0` 已装包**逐模块读取 docstring + 用 `ast` 提取顶层公开名**核实（全程静态解析源码，不 `import` 任何 `hermes_cli` 模块，避免 TTY/网络副作用）；
+> 全部 149 个顶层条目（146 个模块文件 + `subcommands`/`dashboard_auth`/`proxy` 三个子包，均不含包根 `__init__.py`）无一遗漏，按 13 个主题组编排；其中 8 个模块跨主题，在两组的表里各出现一次，第二处只留「见 2.x」指针与同一份代表 API，不是重复盘点。
+> 含嵌套子模块共 205 个 `.py`（同一棵树内全部 `.py`，仅扣除包根 `__init__.py`）。
 >
 > **与 08 的边界**：`08-capability-integration.md` 讲「能力的行为语义」（Goals/Snapshots/MOA/Projects/Bundles 等
 > 在进程内怎么用、有什么实战片段）；本文讲「`hermes_cli` 这个包里**有哪些模块、各自干什么、进程内能不能安全 import**」。
@@ -59,7 +59,7 @@
   并把 Telegram/Slack/QQ/飞书等**消息平台**的消息「喂」给 Agent（即 `24` 个 `hermes-*` 平台集成靠它激活）。
   它是「一个独立服务 + 多平台接入」的中心节点。
 - **API Server**：网关暴露 OpenAI 兼容 HTTP 接口的那一层（`gateway/platforms/api_server.py`，aiohttp；
-  每个请求在服务端创建一个 `AIAgent` 执行）。注意：**`hermes_cli.web_server`（FastAPI，251F/96C）是
+  每个请求在服务端创建一个 `AIAgent` 执行）。注意：**`hermes_cli.web_server`（FastAPI）是
   Web UI / Dashboard**，不含 `/v1/chat/completions`，与 OpenAI 兼容 API Server 是两回事，勿混淆。
   （API Server 形态的完整落地见 `15-api-server.md`。）
 
@@ -104,9 +104,9 @@
 
 ---
 
-## 2. 完整模块清单（146 个顶层模块，按 13 个主题组，不交叉不重合）
+## 2. 完整模块清单（149 个顶层条目，分 13 个主题组）
 
-> 每行：模块 | 一句话真实用途（取自 0.19.0 docstring）| 代表顶层 API（仅列真实存在者）。
+> 每行：模块 | 一句话真实用途（取自该模块的 docstring）| 代表顶层 API。第三列的每个名字都用 `ast` 解析已装包源码核对过，取的是该模块**自身命名空间**里的公开名：顶层 `def` / `async def` / `class` / 赋值（含带类型标注的赋值）/ `__all__`，以及写在顶层 `if` / `try` / `with` 块里的那些；不含下划线开头的名字，不含该模块 import 进来的第三方符号，也不含推测出来的名字。子包（`subcommands` / `dashboard_auth` / `proxy`）取 `__init__.py` 的再导出；`subcommands/__init__.py` 只有 docstring、无再导出，因此该行的代表 API 写成 `组内文件.py::名()` 形式，按那个文件自身的命名空间核对。
 
 ### 2.1 入口与命令分发（Entry & dispatch）
 
@@ -114,107 +114,106 @@
 | --- | --- | --- |
 | `main` | CLI 主入口（`hermes` 命令的总分发） | `main()` |
 | `_parser` | argparse 顶层解析器构造 | `build_top_level_parser()` |
-| `commands` | 斜杠命令定义与自动补全 | 命令注册表（14F/10C） |
-| `subcommands` | `hermes <subcommand>` 的子命令 argparse 解析器构造器（类型/解析辅助内部模块，顶层仅暴露类型注解） | 解析器构造辅助 |
-| `cli_commands_mixin` | 交互式 CLI 斜杠命令处理器（god-file 分解） | 混入类 |
-| `cli_agent_setup_mixin` | `HermesCLI` 的 Agent 构造/会话恢复显示 | 混入类 |
-| `completion` | shell 补全脚本生成 | `generate_completion()` |
-| `oneshot` | `-z` 一次性模式（发一句拿结果即退出） | `OneshotSession` |
-| `send_cmd` | `hermes send`（从 shell 脚本管道文本给 Agent） | `send_command()` |
+| `commands` | 斜杠命令定义与自动补全 | `COMMAND_REGISTRY` / `CommandDef` / `resolve_command()` |
+| `subcommands` | 子命令 argparse 树的分包：每组一个 `build_<组名>_parser()`，由 `main.py` 挂载（40 个文件：39 组 + `_shared.py`） | `subcommands/gateway.py::build_gateway_parser()` / `subcommands/model.py::build_model_parser()` |
+| `cli_commands_mixin` | 交互式 CLI 斜杠命令处理器（god-file 分解） | `CLICommandsMixin` |
+| `cli_agent_setup_mixin` | `HermesCLI` 的 Agent 构造/会话恢复显示 | `CLIAgentSetupMixin` |
+| `completion` | shell 补全脚本生成 | `generate_bash()` / `generate_zsh()` / `generate_fish()` |
+| `oneshot` | `-z` 一次性模式（发一句拿结果即退出） | `run_oneshot()` |
+| `send_cmd` | `hermes send`（从 shell 脚本管道文本给 Agent） | `cmd_send()` / `register_send_subparser()` |
 | `relaunch` | CLI 统一自重启 | `relaunch()` |
-| `console_engine` | 安全 Hermes 控制台命令引擎 | `ConsoleEngine` |
+| `console_engine` | 安全 Hermes 控制台命令引擎 | `HermesConsoleEngine` |
 
 ### 2.2 配置 / 环境 / 平台（Config / env / platform）
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
 | `config` | 配置管理（读/写 `config.yaml`） | `load_config()` / `save_config()` |
-| `env_loader` | 跨入口统一加载 `.env` | `load_env()` |
-| `managed_scope` | IT 推送的、用户不可变配置/环境层 | `ManagedScope` |
+| `env_loader` | 跨入口统一加载 `.env` | `load_hermes_dotenv()` / `get_secret_source()` |
+| `managed_scope` | IT 推送的、用户不可变配置/环境层 | `load_managed_config()` / `apply_managed_overlay()` |
 | `managed_uv` | managed uv 单一路径管理 | `ensure_uv()` |
-| `platforms` | 共享平台注册表 | `PLATFORMS` |
-| `build_info` | 构建期烘焙的元数据 | `BUILD_INFO` |
-| `default_soul` | 首次运行注入的默认 `SOUL.md` 模板 | `DEFAULT_SOUL` |
-| `dep_ensure` | 非 Python 运行时依赖的懒引导 | `ensure_dep()` |
-| `timeouts` | 超时常量 | 常量 |
-| `stdio` | Windows 安全 stdio 配置 | `configure_stdio()` |
+| `platforms` | 共享平台注册表 | `PlatformInfo` / `get_all_platforms()` |
+| `build_info` | 构建期烘焙的元数据 | `get_build_sha()` |
+| `default_soul` | 首次运行注入的默认 `SOUL.md` 模板 | `DEFAULT_SOUL_MD` |
+| `dep_ensure` | 非 Python 运行时依赖的懒引导 | `ensure_dependency()` |
+| `timeouts` | 超时常量解析 | `get_provider_request_timeout()` / `get_provider_stale_timeout()` |
+| `stdio` | Windows 安全 stdio 配置 | `configure_windows_stdio()` |
 | `profiles` | 多 profile 环境隔离（创建/切换/导出/别名/排除技能路径），`HERMES_PROFILE` 决定数据根 | `create_profile()` / `list_profiles()` / `get_active_profile()` |
 
 ### 2.3 认证 / 账号 / 凭证（Auth / accounts / secrets）
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `auth` | 多 provider 认证系统（67F/9C） | `AuthStore` / `get_auth()` |
-| `auth_commands` | 凭证池（credential-pool）子命令 | `PooledCredential` |
-| `copilot_auth` | GitHub Copilot 认证工具 | `authenticate()` |
-| `dingtalk_auth` | 钉钉设备流授权 | `device_flow()` |
-| `nous_account` | Nous Portal 账户权益归一 | `get_entitlements()` |
-| `nous_auth_keepalive` | Nous 长会话后台保活 | `keepalive()` |
-| `nous_billing` | Nous 终端计费 HTTP 客户端 | `BillingClient` |
-| `nous_subscription` | Nous 订阅托管工具能力 | `get_managed_tools()` |
-| `onepassword_secrets_cli` | 1Password 密钥 CLI 处理器 | `op_get()` |
-| `secrets_cli` | Bitwarden 密钥 CLI 处理器 | `bw_get()` |
-| `secret_prompt` | 掩码密钥输入 | `prompt_secret()` |
-| `memory_oauth` | memory provider OAuth HTTP 路由（被 `web_server` 挂载） | OAuth 路由 |
-| `memory_providers` | 桌面 memory provider 声明式 schema | `ProviderSpec` |
-| `memory_setup` | `hermes memory setup\|status` | `setup_memory()` |
-| `dashboard_register` | 自托管 dashboard OAuth 客户端注册 | `register()` |
+| `auth` | 多 provider 认证系统 | `resolve_provider()` / `get_auth_status()` / `ProviderConfig` |
+| `auth_commands` | 凭证池（credential-pool）子命令 | `auth_command()` / `auth_add_command()` |
+| `copilot_auth` | GitHub Copilot 认证工具 | `copilot_device_code_login()` / `resolve_copilot_token()` |
+| `dingtalk_auth` | 钉钉设备流授权 | `dingtalk_qr_auth()` / `begin_registration()` |
+| `nous_account` | Nous Portal 账户权益归一 | `get_nous_portal_account_info()` |
+| `nous_auth_keepalive` | Nous 长会话后台保活 | `start_nous_auth_keepalive()` |
+| `nous_billing` | Nous 终端计费 HTTP 客户端 | `get_billing_state()` / `post_charge()` |
+| `nous_subscription` | Nous 订阅托管工具能力 | `get_nous_subscription_features()` / `get_gateway_eligible_tools()` |
+| `onepassword_secrets_cli` | 1Password 密钥 CLI 处理器 | `register_cli()` / `cmd_set()` |
+| `secrets_cli` | Bitwarden 密钥 CLI 处理器 | `register_cli()` / `cmd_sync()` |
+| `secret_prompt` | 掩码密钥输入 | `masked_secret_prompt()` |
+| `memory_oauth` | memory provider OAuth HTTP 路由（被 `web_server` 挂载） | `start_memory_oauth()` / `router` |
+| `memory_setup` | `hermes memory setup\|status` | `memory_command()` / `cmd_setup()` |
+| `dashboard_register` | 自托管 dashboard OAuth 客户端注册 | `cmd_dashboard_register()` |
 | `dashboard_auth` | Dashboard 认证 provider 框架（OAuth/Token 会话、provider 注册与列举） | `DashboardAuthProvider` / `register_provider()` |
-| `pairing` | DM pairing 系统 CLI | `pair()` |
-| `portal_cli` | Nous Portal 人类可读入口 | `portal()` |
+| `pairing` | DM pairing 系统 CLI | `pairing_command()` |
+| `portal_cli` | Nous Portal 人类可读入口 | `portal_command()` |
 
 ### 2.4 供应商 / 模型（Provider / model）
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `providers` | provider 身份唯一真相（13F/3C） | `get_provider()` / `is_aggregator()` |
+| `providers` | provider 身份唯一真相 | `get_provider()` / `is_aggregator()` |
 | `provider_catalog` | 统一 provider 目录（单一真相源） | `provider_catalog` / `provider_catalog_by_slug` |
-| `models` | 规范模型目录与轻量校验（47F/3C） | `MODELS` / `validate_model()` |
-| `model_catalog` | 远程模型目录拉取 | `fetch_catalog()` |
-| `model_cost_guard` | 昂贵模型选择确认（21F/4C） | `confirm_expensive()` |
-| `model_normalize` | 每 provider 模型名归一 | `normalize()` |
-| `model_setup_flows` | 每 provider 选型向导流 | `run_flow()` |
-| `model_switch` | CLI/gateway 共享 `/model` 切换逻辑（21F/7C） | `switch_model()` |
-| `codex_models` | Codex 模型发现 | `discover()` |
-| `fallback_cmd` | fallback provider 链管理 | `manage_fallback()` |
+| `models` | 规范模型目录与轻量校验 | `validate_requested_model()` / `ProviderEntry` |
+| `model_catalog` | 远程模型目录拉取 | `get_catalog()` |
+| `model_cost_guard` | 昂贵模型选择确认 | `expensive_model_warning()` |
+| `model_normalize` | 每 provider 模型名归一 | `normalize_model_for_provider()` |
+| `model_setup_flows` | 每 provider 选型向导流 | `bedrock_model_routable_from_region()` |
+| `model_switch` | CLI/gateway 共享 `/model` 切换逻辑 | `switch_model()` |
+| `codex_models` | Codex 模型发现 | `get_codex_model_ids()` |
+| `fallback_cmd` | fallback provider 链管理 | `cmd_fallback()` / `cmd_fallback_add()` |
 | `fallback_config` | 读取生效 fallback 链 | `get_fallback_chain()` |
-| `xai_retirement` | 检测 2026-05-15 退役的 xAI 模型 | `detect_retired()` |
+| `xai_retirement` | 检测 2026-05-15 退役的 xAI 模型 | `find_retired_xai_refs()` / `apply_migration()` |
 | `azure_detect` | Azure Foundry 端点自动检测 | `detect()` |
-| `context_switch_guard` | 会话内模型切换触发压缩警告 | `warn_if_compress()` |
+| `context_switch_guard` | 会话内模型切换触发压缩警告 | `merge_preflight_compression_warning()` |
 
 ### 2.5 网关 / Web / API Server（Gateway / web）
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `gateway` | 网关子命令（69F/6C） | `gateway()` |
-| `gateway_windows` | Windows 网关服务后台（计划任务+启动文件夹） | `install_service()` |
-| `gateway_enroll` | 自托管网关注册 relay connector | `enroll()` |
-| `web_server` | Web UI 服务器 / API Server `/v1`（251F/96C，最大模块） | `WebServer` |
-| `webhook` | 动态 webhook 订阅管理 | `manage_webhook()` |
-| `web_git` | 桌面 coding 轨后端 git 操作 | `git_op()` |
+| `gateway` | 网关子命令 | `gateway_command()` / `run_gateway()` |
+| `gateway_windows` | Windows 网关服务后台（计划任务+启动文件夹） | `install()` / `is_installed()` |
+| `gateway_enroll` | 自托管网关注册 relay connector | `cmd_gateway_enroll()` |
+| `web_server` | Web UI 服务器（FastAPI 后端 + Vite/React 前端 + REST API），本包最大模块（`web_server.py` 19441 行）；**不含** `/v1/chat/completions`（见 §1.2） | `start_server()` / `auth_middleware()` / `app` |
+| `webhook` | 动态 webhook 订阅管理 | `webhook_command()` |
+| `web_git` | 桌面 coding 轨后端 git 操作 | `repo_status()` / `review_commit()` |
 | `proxy` | 本地 OpenAI 兼容代理：把请求转发到 OAuth 鉴权的上游（网关节点用） | `UpstreamAdapter` |
-| `container_boot` | 每 profile 网关 s6 服务协调 | `reconcile()` |
-| `pty_session` | dashboard 终端保活 PTY | `keepalive_pty()` |
-| `win_pty_bridge` | Windows ConPTY 桥（dashboard chat tab） | `ConPTYBridge` |
-| `pt_input_extras` | prompt_toolkit 输入解析增强 | 解析表 |
-| `voice` | TUI gateway 语音录制 + TTS API | `record()` / `tts()` |
+| `container_boot` | 每 profile 网关 s6 服务协调 | `reconcile_profile_gateways()` / `ReconcileAction` |
+| `pty_session` | dashboard 终端保活 PTY | `PtySessionRegistry` / `run_reaper()` |
+| `win_pty_bridge` | Windows ConPTY 桥（dashboard chat tab） | `WinPtyBridge` / `PtyUnavailableError` |
+| `pt_input_extras` | prompt_toolkit 输入解析增强 | `install_shift_enter_alias()` / `install_ignored_terminal_sequences()` |
+| `voice` | TUI gateway 语音录制 + TTS API | `start_recording()` / `speak_text()` |
 
 ### 2.6 工具 / 工具集配置（Tools / toolset config）
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `tools_config` | 统一工具配置（`disabled_toolsets` 持久化解析） | `load_tools_config()` |
-| `toolset_validation` | `platform_toolsets` 配置段校验 | `validate()` |
-| `skills_config` | 技能配置 | `load_skills_config()` |
-| `skills_hub` | Hermes 技能中心 CLI（25F/5C） | `SkillsHub` |
-| `mcp_catalog` | 精选、Nous 审核过的 MCP 服务器目录（17F/10C） | `MCP_CATALOG` |
-| `mcp_config` | `hermes mcp` 子命令（17F/2C） | `mcp()` |
-| `mcp_picker` | 交互式 `hermes mcp picker` | `picker()` |
-| `mcp_security` | 用户配置 MCP server 条目的安全校验 | `check_mcp()` |
-| `mcp_startup` | 后台 MCP 发现的 CLI/TUI 安全 helper | `discover_mcp()` |
-| `callbacks` | `terminal_tool` 交互式 prompt 回调 | 回调 |
-| `clipboard` | 剪贴板图片提取（mac/win/linux/wsl2） | `get_clipboard_image()` |
-| `browser_connect` | 附加本地 Chromium CDP 端口 helper | `attach_cdp()` |
+| `tools_config` | 统一工具配置：`hermes tools` / `hermes setup tools` 的落点，把各平台勾选的 toolset 写进 `platform_toolsets`，并读 `agent.disabled_toolsets` | `tools_command()` / `CONFIGURABLE_TOOLSETS` / `enabled_mcp_server_names()` |
+| `toolset_validation` | `platform_toolsets` 配置段校验 | `validate_platform_toolsets()` |
+| `skills_config` | 技能配置 | `get_disabled_skills()` / `skills_command()` |
+| `skills_hub` | Hermes 技能中心 CLI | `skills_command()` / `do_install()` |
+| `mcp_catalog` | 精选、Nous 审核过的 MCP 服务器目录 | `list_catalog()` / `CatalogEntry` |
+| `mcp_config` | `hermes mcp` 子命令 | `mcp_command()` / `cmd_mcp_add()` |
+| `mcp_picker` | 交互式 `hermes mcp picker` | `run_picker()` |
+| `mcp_security` | 用户配置 MCP server 条目的安全校验 | `validate_mcp_server_entry()` / `is_mcp_server_entry_suspicious()` |
+| `mcp_startup` | 后台 MCP 发现的 CLI/TUI 安全 helper | `start_background_mcp_discovery()` |
+| `callbacks` | `terminal_tool` 交互式 prompt 回调 | `clarify_callback` / `approval_callback` / `prompt_for_secret` |
+| `clipboard` | 剪贴板图片提取（mac/win/linux/wsl2） | `save_clipboard_image()` / `has_clipboard_image()` |
+| `browser_connect` | 附加本地 Chromium CDP 端口 helper | `discover_local_cdp_url()` / `try_launch_chrome_debug()` |
 
 ### 2.7 能力模块（Capabilities：目标/项目/看板/旅程/策展/MOA/Bundles/Blueprint/会话）
 
@@ -223,115 +222,115 @@
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `goals` | 持久会话目标（Ralph 循环，12F/6C） | `GoalManager` / `GoalState` / `parse_contract` |
-| `projects_cmd` | `hermes project` CLI（一级多文件夹 Project 管理） | `project()` |
-| `projects_db` | 每 profile 一级 Project 存储（24F/3C） | `create_project()` / `connect_closing()` / `set_active()` |
-| `kanban` | `hermes kanban` 子命令 | `kanban()` |
-| `kanban_db` | SQLite 看板（多 profile/多 project，96F/12C） | `KanbanBoard` |
-| `kanban_decompose` | 看板分解器（把 triage 任务拆成子任务图） | `decompose()` |
-| `kanban_diagnostics` | 看板诊断（结构化告警信号） | `diagnose()` |
-| `kanban_specify` | 看板 triage 指定器（一句话展开成 spec） | `specify()` |
-| `kanban_swarm` | 看板 Swarm v1 拓扑 helper | `swarm_topology()` |
-| `journey` | `hermes journey`（Hermes 学到的时间线，3F/1C） | `cmd_journey()` |
-| `curator` | `hermes curator` 子命令（2F/3C） | `cli_main()` / `apply_automatic_transitions()` |
-| `moa_cmd` | MOA 配置 CLI helper（6F/1C） | `moa_cmd()` |
-| `moa_config` | MoA 配置 + 斜杠命令 helper（10F/1C） | `resolve_moa_preset()` / `set_active_moa_preset()` / `normalize_moa_config()` |
-| `bundles` | `hermes bundles` 子命令（8F/2C） | `scan_bundles()` / `delete_bundle()` |
+| `goals` | 持久会话目标（Ralph 循环） | `GoalManager` / `GoalState` / `parse_contract` |
+| `projects_cmd` | `hermes project` CLI（一级多文件夹 Project 管理） | `projects_command()` |
+| `projects_db` | 每 profile 一级 Project 存储 | `create_project()` / `connect_closing()` / `set_active()` |
+| `kanban` | `hermes kanban` 子命令 | `kanban_command()` / `run_slash()` |
+| `kanban_db` | SQLite 看板（多 profile/多 project） | `connect()` / `create_task()` / `Task` |
+| `kanban_decompose` | 看板分解器（把 triage 任务拆成子任务图） | `decompose_task()` / `DecomposeOutcome` |
+| `kanban_diagnostics` | 看板诊断（结构化告警信号） | `compute_task_diagnostics()` / `Diagnostic` |
+| `kanban_specify` | 看板 triage 指定器（一句话展开成 spec） | `specify_task()` / `SpecifyOutcome` |
+| `kanban_swarm` | 看板 Swarm v1 拓扑 helper | `create_swarm()` / `SwarmWorkerSpec` |
+| `journey` | `hermes journey`（Hermes 学到的时间线） | `cmd_journey()` |
+| `curator` | `hermes curator` 子命令 | `register_cli()` / `cli_main()` |
+| `moa_cmd` | MOA 配置 CLI helper | `cmd_moa()` |
+| `moa_config` | MoA 配置 + 斜杠命令 helper | `resolve_moa_preset()` / `set_active_moa_preset()` / `normalize_moa_config()` |
+| `bundles` | `hermes bundles` 子命令 | `bundles_command()` / `register_cli()` |
 | `blueprint_cmd` | `/blueprint` 共享命令逻辑（CLI/TUI/网关） | `handle_blueprint_command()` |
-| `checkpoints` | `hermes checkpoints` CLI 子命令（会话消息级快照） | `checkpoints()` |
+| `checkpoints` | `hermes checkpoints` CLI 子命令（会话消息级快照） | `register_cli()` / `cmd_list()` |
 | `active_sessions` | 跨进程活动会话租约 | `ActiveSessionLease` |
-| `session_listing` | CLI/gateway 会话列表 helper | `list_sessions()` |
-| `session_filters` | `hermes sessions prune/archive` 过滤 | `parse_filters()` |
-| `session_recap` | 会话回顾摘要 | `recap()` |
-| `session_export` | 会话导出共享渲染器（6F/3C） | `render_export()` |
-| `session_export_html` | 会话 HTML 导出生成器 | `export_html()` |
-| `session_export_md` | 会话 Markdown/QMD 导出 helper | `export_md()` |
-| `prompt_size` | prompt 规模诊断（`` hermes prompt-size``） | `diagnose_prompt()` |
-| `partial_compress` | 边界感知部分压缩（"总结到此处"） | `partial_compress()` |
-| `suggestions_cmd` | `/suggestions` 共享命令逻辑 | `suggestions()` |
-| `write_approval_commands` | `/memory` `/skills` 写审批子命令 | `approval_handler()` |
+| `session_listing` | CLI/gateway 会话列表 helper | `query_session_listing()` |
+| `session_filters` | `hermes sessions prune/archive` 过滤 | `build_prune_filters()` / `describe_filters()` |
+| `session_recap` | 会话回顾摘要 | `build_recap()` |
+| `session_export` | 会话导出共享渲染器 | `render_sessions_export()` |
+| `session_export_html` | 会话 HTML 导出生成器 | `generate_html_export()` |
+| `session_export_md` | 会话 Markdown/QMD 导出 helper | `render_session_markdown()` |
+| `prompt_size` | prompt 规模诊断（`hermes prompt-size`） | `compute_prompt_breakdown()` / `cmd_prompt_size()` |
+| `partial_compress` | 边界感知部分压缩（"总结到此处"） | `split_history_for_partial_compress()` |
+| `suggestions_cmd` | `/suggestions` 共享命令逻辑 | `handle_suggestions_command()` |
+| `write_approval_commands` | `/memory` `/skills` 写审批子命令 | `handle_pending_subcommand()` |
 
 ### 2.8 安全 / 审计（Security / audit）
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `security_audit` | 安装包按需供应链审计（5F/4C） | `run_audit()` / `Finding` / `Component` |
+| `security_audit` | 安装包按需供应链审计 | `run_audit()` / `Finding` / `Component` |
 | `security_audit_startup` | 启动期安全态势审计（warn-on-load，不阻塞） | `log_startup_security_warnings()` |
-| `security_advisories` | 安全公告检查（11F/3C） | `check_advisories()` |
-| `mcp_security` | 用户配置 MCP server 安全校验（见 2.6） | `check_mcp()` |
-| `runtime_provider` | CLI/gateway/cron 共享运行时 provider 解析（24F/4C） | `resolve_runtime_provider()` |
-| `credential_lifecycle` | 跨所有 store 的统一 provider 凭证生命周期 | `rotate_credential()` |
-| `input_sanitize` | 清洗终端/paste 泄漏到用户 prompt 的控制序列 | `sanitize_prompt()` |
+| `security_advisories` | 安全公告检查 | `detect_compromised()` / `startup_banner()` |
+| `mcp_security` | 用户配置 MCP server 安全校验（见 2.6） | `validate_mcp_server_entry()` |
+| `runtime_provider` | CLI/gateway/cron 共享运行时 provider 解析 | `resolve_runtime_provider()` |
+| `credential_lifecycle` | 跨所有 store 的统一 provider 凭证生命周期 | `save_provider_env_credential()` / `purge_env_credential_references()` |
+| `input_sanitize` | 清洗终端/paste 泄漏到用户 prompt 的控制序列 | `sanitize_user_prompt_text()` |
 | `urllib_security` | 携带凭证的 stdlib urllib 请求安全策略 | `open_credentialed_url()` |
 
 ### 2.9 安装 / 卸载 / 部署 / 迁移（Install / uninstall / migrate）
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `setup` | 交互式安装向导（35F/3C） | `run_setup()` |
-| `setup_whatsapp_cloud` | WhatsApp Cloud 适配向导 | `setup()` |
-| `uninstall` | Hermes Agent 卸载器（17F/2C） | `uninstall()` |
-| `gui_uninstall` | Desktop Chat GUI 卸载器（12F/2C） | `uninstall_gui()` |
-| `doctor` | 诊断命令（15F/2C） | `doctor()` |
-| `migrate` | `hermes migrate` 处理器（4F/3C） | `migrate()` |
-| `codex_runtime_plugin_migration` | MCP/Codex 插件配置迁移 | `migrate_plugins()` |
-| `codex_runtime_switch` | `/codex-runtime` 共享逻辑 | `switch_runtime()` |
-| `claw` | OpenClaw 迁移命令（12F/3C） | `claw()` |
-| `inventory` | provider/model 清单上下文（dashboard 共享底座） | `Inventory` |
+| `setup` | 交互式安装向导 | `run_setup_wizard()` |
+| `setup_whatsapp_cloud` | WhatsApp Cloud 适配向导 | `run_whatsapp_cloud_setup()` |
+| `uninstall` | Hermes Agent 卸载器 | `run_uninstall()` |
+| `gui_uninstall` | Desktop Chat GUI 卸载器 | `uninstall_gui()` |
+| `doctor` | 诊断命令 | `run_doctor()` |
+| `migrate` | `hermes migrate` 处理器 | `cmd_migrate()` |
+| `codex_runtime_plugin_migration` | MCP/Codex 插件配置迁移 | `migrate()` / `MigrationReport` |
+| `codex_runtime_switch` | `/codex-runtime` 共享逻辑 | `get_current_runtime()` / `set_runtime()` |
+| `claw` | OpenClaw 迁移命令 | `claw_command()` |
+| `inventory` | provider/model 清单上下文（dashboard 共享底座） | `load_picker_context()` / `ConfigContext` |
 | `profile_describer` | 自动生成 profile `description` | `describe_profile()` |
-| `profile_distribution` | 可分享、git 打包的 profile（10F/8C） | `PackageDistribution` |
+| `profile_distribution` | 可分享、git 打包的 profile | `read_manifest()` / `DistributionManifest` |
 
 ### 2.10 运行 / 服务 / 调度（Runtime / service / cron / backup）
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `service_manager` | 抽象服务管理接口（4F/10C） | `ServiceManager` |
-| `cron` | `hermes cron` 子命令（7F/2C） | `cron()`（底层 `cronjob` 工具集逻辑可复用） |
-| `backup` | 备份与导入命令（13F/4C） | `create_quick_snapshot()` / `create_pre_update_backup()` / `restore_cron_jobs_if_emptied()` |
-| `logs` | `hermes logs` 查看/过滤（4F/3C） | `view_logs()` |
-| `status` | 状态命令（15F/3C） | `status()` |
-| `debug` | `hermes debug` 工具（12F/3C） | `debug()` |
-| `dump` | dump 命令（8F/1C） | `dump()` |
-| `diagnostics_upload` | `hermes debug share` 上传 Nous S3 | `upload()` |
-| `tips` | 会话开始随机提示 | `random_tip()` |
-| `banner` | 欢迎横幅 + 更新检查（12F/1C） | `print_banner()` |
-| `hooks` | `hermes hooks` shell 脚本管理 | `inspect_hooks()` |
-| `middleware` | 中间件契约 helper（11F/2C） | `Middleware` |
-| `pets` | `hermes pets` 子命令 | `pets()` |
-| `plugins` | Hermes 插件系统（25F/7C） | `PluginSystem` |
-| `plugins_cmd` | `hermes plugins` 子命令（15F/3C） | `plugins()` |
-| `sqlite_util` | 小型 per-profile/board 存储的 SQLite 原语 | `open_store()` |
+| `service_manager` | 抽象服务管理接口 | `ServiceManager` |
+| `cron` | `hermes cron` 子命令 | `cron_command()` / `cron_tick()` |
+| `backup` | 备份与导入命令 | `create_quick_snapshot()` / `create_pre_update_backup()` / `restore_cron_jobs_if_emptied()` |
+| `logs` | `hermes logs` 查看/过滤 | `tail_log()` / `list_logs()` |
+| `status` | `hermes status`：逐项显示 Hermes 各组件状态（密钥在输出里脱敏） | `show_status()` / `redact_key()` / `check_mark()` |
+| `debug` | `hermes debug` 工具 | `run_debug()` / `collect_debug_report()` |
+| `dump` | dump 命令 | `run_dump()` |
+| `diagnostics_upload` | `hermes debug share` 上传 Nous S3 | `share_to_nous()` |
+| `tips` | 会话开始随机提示 | `get_random_tip()` |
+| `banner` | 欢迎横幅 + 更新检查 | `build_welcome_banner()` |
+| `hooks` | `hermes hooks` shell 脚本管理 | `hooks_command()` |
+| `middleware` | 中间件契约 helper | `RequestMiddlewareResult` / `VALID_MIDDLEWARE` |
+| `pets` | `hermes pets` 子命令 | `register_cli()` / `print_pet_gallery()` |
+| `plugins` | Hermes 插件系统 | `PluginManager` / `PluginContext` |
+| `plugins_cmd` | `hermes plugins` 子命令 | `plugins_command()` |
+| `sqlite_util` | 小型 per-profile/board 存储的 SQLite 原语 | `write_txn()` / `add_column_if_missing()` |
 
 ### 2.11 消息平台桥（IM / messaging bridges）
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `slack_cli` | `hermes slack` 子命令 | `slack()` |
-| `telegram_managed_bot` | Telegram 托管机器人接入（15F/2C） | `onboard()` |
-| `pairing` | DM pairing（见 2.3） | `pair()` |
-| `webhook` | 动态 webhook（见 2.5） | `manage_webhook()` |
-| `cli_billing_mixin` | 交互式 CLI 计费/订阅处理器（god-file 分解） | 混入类 |
+| `slack_cli` | `hermes slack` 子命令 | `slack_manifest_command()` |
+| `telegram_managed_bot` | Telegram 托管机器人接入 | `auto_setup_telegram_bot()` |
+| `pairing` | DM pairing（见 2.3） | `pairing_command()` |
+| `webhook` | 动态 webhook（见 2.5） | `webhook_command()` |
+| `cli_billing_mixin` | 交互式 CLI 计费/订阅处理器（god-file 分解） | `CLIBillingMixin` |
 
 ### 2.12 UI / TUI 渲染（UI / TUI rendering）
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `curses_ui` | curses 共享 UI 组件 | `CursesComponent` |
-| `skin_engine` | CLI 皮肤/主题引擎（13F/3C） | `SkinEngine` |
-| `colors` | 共享 ANSI 颜色工具 | `colorize()` |
-| `cli_output` | CLI 输出 helper | `output()` |
-| `voice` | 语音（见 2.5，TUI gateway 用） | `record()` |
-| `clipboard` | 剪贴板（见 2.6） | `get_clipboard_image()` |
+| `curses_ui` | curses 共享 UI 组件 | `curses_checklist()` / `curses_single_select()` |
+| `skin_engine` | CLI 皮肤/主题引擎 | `load_skin()` / `SkinConfig` |
+| `colors` | 共享 ANSI 颜色工具 | `color()` / `Colors` |
+| `cli_output` | CLI 输出 helper | `print_info()` / `prompt_yes_no()` |
+| `voice` | 语音（见 2.5，TUI gateway 用） | `start_recording()` |
+| `clipboard` | 剪贴板（见 2.6） | `save_clipboard_image()` |
 
 ### 2.13 Windows / 平台特定（Windows / platform-specific）
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `_subprocess_compat` | Windows 子进程兼容 helper（5F） | `windows_detach_popen_kwargs()` |
-| `gateway_windows` | Windows 网关服务（见 2.5） | `install_service()` |
-| `stdio` | Windows 安全 stdio（见 2.2） | `configure_stdio()` |
-| `win_pty_bridge` | Windows ConPTY 桥（见 2.5） | `ConPTYBridge` |
-| `psutil_android` | psutil Android 兼容临时安装 | `ensure_psutil()` |
+| `_subprocess_compat` | Windows 子进程兼容 helper | `windows_detach_popen_kwargs()` |
+| `gateway_windows` | Windows 网关服务（见 2.5） | `install()` |
+| `stdio` | Windows 安全 stdio（见 2.2） | `configure_windows_stdio()` |
+| `win_pty_bridge` | Windows ConPTY 桥（见 2.5） | `WinPtyBridge` |
+| `psutil_android` | psutil Android 兼容临时安装 | `prepare_patched_psutil_sdist()` |
 | `pty_bridge` | PTY 桥（依赖 `fcntl`，**仅 Linux 可 import**；Windows 导入即 `ModuleNotFoundError`） | `PtyBridge` |
 
 ---
@@ -348,29 +347,32 @@ cfg["some_key"] = "v"
 save_config(cfg)
 ```
 
-### 3.2 工具集开关持久化 —— `hermes_cli.tools_config`
+### 3.2 工具集配置读取 —— `hermes_cli.tools_config`
 ```python
-from hermes_cli.tools_config import load_tools_config
-tc = load_tools_config()     # 解析 enabled/disabled toolsets 配置段
+from hermes_cli.config import load_config
+from hermes_cli.tools_config import CONFIGURABLE_TOOLSETS, enabled_mcp_server_names
+CONFIGURABLE_TOOLSETS                     # 可在设置面勾选的 toolset 全集（list[tuple]）
+enabled_mcp_server_names(load_config())   # config.yaml 里已启用的 MCP server 名
 ```
 
 ### 3.3 定时任务底层逻辑 —— `hermes_cli.cron`
-> 注意：`cron()` 主函数是 CLI 子命令入口；但其背后的 `cronjob` 工具集逻辑（与 `tools.cronjob_tools` 配合）
+> 注意：`cron_command()` 是 CLI 子命令入口；但其背后的 `cronjob` 工具集逻辑（与 `tools.cronjob_tools` 配合）
 > 是进程内可调度的能力。桌面应用若要做「定时触发 Agent」，直接用 `AIAgent` + 自己的调度器，
-> 复用 `cron` 模块做配置解析，不要调用 `cron()` 起子命令。
+> 复用 `cron` 模块里的纯函数（`cron_list` / `cron_tick` / `cron_runs`），不要调用 `cron_command()` 起子命令。
 
 ### 3.4 MOA 预设解析 —— `hermes_cli.moa_config`
 ```python
-from hermes_cli.moa_config import resolve_moa_preset, set_active_moa_preset, normalize_moa_config
-spec = resolve_moa_preset("balanced")     # 解析 MoA 预设
-set_active_moa_preset("balanced")         # 写入 llm.json（激活虚拟 provider=moa）
+from hermes_cli.config import load_config
+from hermes_cli.moa_config import resolve_moa_preset, set_active_moa_preset
+spec = resolve_moa_preset(load_config().get("moa") or {}, "balanced")   # 返回该预设的 dict
+cfg = set_active_moa_preset(load_config().get("moa") or {}, "balanced")  # 只改内存中的 active_preset，不落盘
 ```
 > MoA 的进程内实战见 `08` §3（经 `run_conversation(moa_config=)` 驱动）。
 
 ### 3.5 备份 —— `hermes_cli.backup`
 ```python
 from hermes_cli.backup import create_quick_snapshot, restore_cron_jobs_if_emptied
-create_quick_snapshot(reason="before-update")   # 落 HERMES_HOME 快照
+create_quick_snapshot(label="before-update")   # 落 HERMES_HOME 快照
 ```
 
 ### 3.6 Profile 管理 —— `hermes_cli.profiles`
@@ -382,7 +384,7 @@ create_profile("work")     # 多环境隔离（per-profile 配置/会话/能力�
 ### 3.7 能力状态内核模块（行为见 `08`）
 - `goals` → `GoalManager`（持久会话目标）
 - `projects_db` → `create_project` / `connect_closing` / `set_active`（一级多文件夹 Project）
-- `bundles` → `scan_bundles` / `delete_bundle`（技能捆绑包，底层 `agent.skill_bundles`）
+- `bundles` → `bundles_command`（技能捆绑包 CLI 子命令）；扫描与删除的真实实现在 `agent.skill_bundles`（`scan_bundles` / `delete_bundle`），进程内要读捆绑包直接用它
 - `moa_config` → MOA 预设（见 3.4）
 - `security_audit` / `security_audit_startup` → 供应链审计（启动 warn，不阻塞）
 - `backup` → 见 3.5
@@ -417,7 +419,7 @@ p = get_provider("openrouter")
 | 主题 | 归属文件 | 本文 role |
 | --- | --- | --- |
 | `AIAgent` 构造参数/回调/SSE 词汇 | `01-library-api.md` | 进程内驱动核心（本文不涉及） |
-| 三条集成路径 / SSE 桥接 / 最小骨架 | `02-integration-core.md` | 路径 B 的模块级清单见本文 §3（02 §3 改为指向本文） |
+| 路径 A/B/C 与 5 条调用路线 / SSE 桥接 / 最小骨架 | `02-integration-core.md` | 路径 B 的模块级清单见本文 §3（02 §4 只留路线红线并指向本文） |
 | 57 工具集逐条 | `03-capabilities-and-toolsets.md` | 工具集行为（本文不列） |
 | 多框架接入（FastHTML/Tkinter/…） | `04-rendering-frameworks.md` | 渲染层（本文不列） |
 | 安装/环境/HERMES_HOME | `05-install-and-env.md` | 环境（本文 §2.2/§2.9 仅标模块） |
@@ -427,4 +429,4 @@ p = get_provider("openrouter")
 | 集成自测/端到端 | `09-integration-e2e.md` | 测试（本文不列） |
 
 > 任何对 `hermes_cli` 模块的「能力行为」描述若与 `08` 重叠，以 `08` 为准；本文只负责「模块存在性 / 用途 /
-> 代表 API」这一层，确保全 146 个顶层模块不遗漏、不重复、不交叉。
+> 代表 API」这一层，确保全 149 个顶层条目不遗漏；8 个跨主题模块只在主组列全信息，另一组留指针。

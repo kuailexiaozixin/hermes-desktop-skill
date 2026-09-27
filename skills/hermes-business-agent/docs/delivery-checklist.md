@@ -8,7 +8,7 @@
 ## A. 机器门禁（release_gate 全自动）
 
 - [ ] `python scripts/release_gate.py --verify-launch` 全绿（exit 0）
-  - [ ] `quality_check`：py_compile + 结构门禁 + 离线桥接测试 + 源码签名漂移无破坏性变更
+  - [ ] `quality_check`：py_compile + 结构门禁 + 离线桥接测试 + 源码签名漂移无破坏性变更 + 模块清单对账（`10`/`12`/`13`/`16`）
   - [ ] `check_endpoints`：前端→后端路由链路无未覆盖引用（运行时 404 隐患）
   - [ ] `check_js_modules`：前端 ES 模块强制校验（仅「禁用 HTMX/Pico 的原生 ES 模块前端」示例；无 node/无 JS 前端自动 SKIP，不阻塞纯 Python / Tkinter / HTMX·Pico 示例）；有 JS 前端时必须 SYNTAX-OK + ALL IMPORTS RESOLVED OK
   - [ ] `smoke_test_web`：网页无头冒烟，`GET /` 含关键 DOM id + `/healthz` 200（已把 B 档 DOM id 检查自动化）
@@ -129,7 +129,7 @@
 ## D. 版本与漂移（若改了技能本体）
 
 - [ ] `scripts/track_upstream.py`：**不带 `--gate`** 跑一次，读四条漂移线（① PyPI 版本 / ② 文档 md5 / ③ 源码签名 / ④ API 参考），任一 DRIFT 退出码为 1。带 `--gate`（即发布门禁里的 [0] 步）时四条全部降级为提示、恒返回 0——基线锁定版本是有意选择，不阻塞发布
-- [ ] `scripts/check_api_signature.py`：OK:true（无 REMOVED/ADDED/DEFAULT_CHANGED）。**签名漂移真正的阻断点是这一条**（它同时是 `quality_check.py` 六段之一）
+- [ ] `scripts/check_api_signature.py`：OK:true（无 REMOVED/ADDED/DEFAULT_CHANGED）。**签名漂移真正的阻断点是这一条**（它同时是 `quality_check.py` 七段之一）
 - [ ] 基线表 / `scripts/api-baseline.json` / `CHANGELOG.md` 已随版本更新
 - [ ] `version` 号已 +0.1.0（见 SKILL.md _frontmatter）
 

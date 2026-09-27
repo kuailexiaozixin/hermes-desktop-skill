@@ -40,9 +40,10 @@
 | `check_api_signature.py` | 比对 `api-baseline.json`（当前 `baseline_version` 的签名基线）发现 API 漂移 | 全 | 入场检查 |
 | `gen_api_reference.py` | 重生成 `references/api-reference/`（升级后） | 全 | 入场检查（升级后） |
 | `check_skill_gate.py` | 技能自身结构/引用门禁（关键文件在位 + 文档体积） | 全（改技能时） | ⑧ |
-| `quality_check.py` | 6 段一键 Check（py_compile + 技能结构 + 离线桥接 + 签名漂移 + 网页回归 + 文档链接） | 全 | ⑦ |
+| `quality_check.py` | 7 段一键 Check（py_compile + 技能结构 + 离线桥接 + 签名漂移 + 网页回归 + 文档链接 + 模块清单对账） | 全 | ⑦ |
 | `check_golden_coverage.py` | **跑在业务项目上**的对账门：Golden 用例集 ↔ 契约表面表/验收表，12 条硬门禁（回指双向、背书非空、逐工具覆盖、写面回读、弱断言、禁止面未被期望触发、计算题行登记了来源），离线无 Key、不执行用例；用法与它查不到的三件事见脚本首段与 `20` §4.3 | 全（有 Golden 集才跑） | ⑤⑦ |
 | `check_doc_links.py` | 文档相对链接完整性（被 quality_check 第 6 段调用） | 全（改文档时） | ⑦ |
+| `check_module_tables.py` | `10`/`12`/`13`/`16` 的「全量模块清单」逐行与已装包源码对账：模块存在、代表 API 名属于该模块自己的命名空间、分组标题（N 个）＝行数、口径数＝实测；另核对 `11` 各节的「**规模**：N 类 / M 函数」＝该模块顶层公开定义的实测数（被 quality_check 第 7 段调用；未装 hermes-agent 时降级跳过） | 全（改这几份清单或升级库时） | ⑦ |
 | `check_js_modules.py` | 前端 ES 模块完整性 | 有 JS 前端（B 类宿主 / ④⑤ 客户端） | ⑤⑧ |
 | `check_endpoints.py` | 前端→后端路由链路校验（捕获运行时 404；递归扫全部 `.py` 含 `routes/` 包） | 有 HTTP 面（路线①⑤ 自建 / ④） | ⑤⑧ |
 | `smoke_test_web.py` | 网页无头冒烟（关键 DOM id + `/healthz` 200，无需 Key） | 有 Web UI | ⑦⑧ |
@@ -53,7 +54,7 @@
 
 <a id="drift"></a>**上游漂移跟踪**：能力/签名漂移由 `check_api_signature.py`（比对 `api-baseline.json`，0.19.0 基线）+ `track_upstream.py`（含第四线：`references/api-reference/` 记录的版本 vs 本地已装，`--regenerate-apiref` 可自动重生成）/ `probe_library.py` 看守；升级 hermes-agent 后先跑 `check_api_signature.py`，有漂移先更新本文档与基线（见 SKILL.md〔入场检查〕）。
 
-**`track_upstream.py` 的退出码语义**（源码 `scripts/track_upstream.py:351-365` 实测）：不带 `--gate` 时四条线任一 DRIFT 即返回 1——包含 ① PyPI 版本线，而基线锁定后上游一发新版它必然报，所以它的 1 只表示「上游发新版了」，不表示本技能失效；带 `--gate`（`release_gate.py` 的 [0] 步用法）时四条线一律只打印提示、恒返回 0。因此「签名漂没漂」的硬阻断点是 `check_api_signature.py`（它同时是 `quality_check.py` 六段之一），不是 `track_upstream --gate`。
+**`track_upstream.py` 的退出码语义**（源码 `scripts/track_upstream.py` 的 `if not args.gate:` 那一段实测）：不带 `--gate` 时四条线任一 DRIFT 即返回 1——包含 ① PyPI 版本线，而基线锁定后上游一发新版它必然报，所以它的 1 只表示「上游发新版了」，不表示本技能失效；带 `--gate`（`release_gate.py` 的 [0] 步用法）时四条线一律只打印提示、恒返回 0。因此「签名漂没漂」的硬阻断点是 `check_api_signature.py`（它同时是 `quality_check.py` 七段之一），不是 `track_upstream --gate`。
 
 **改 .py 门禁**：`py_compile` + 导入测试。**改 .js 门禁**：`node --check`。
 **改 .py 后打包门禁**：启动 EXE 验证业务健康端点（`release_gate.py --verify-launch`）。

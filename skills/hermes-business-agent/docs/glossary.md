@@ -22,7 +22,7 @@
 | **`HERMES_HOME`** | Hermes 运行数据（配置/会话/轨迹）根目录。解析顺序：上下文覆盖 → 同名环境变量 → 平台默认；冻结态无人替你钉，须由启动器显式钉到制品目录（`05` §3） |
 | **SSE** | Server-Sent Events；FastHTML 路线把队列事件推给前端的线格式（`04` §1）。与 `event_callback` 是两件事，别混为一谈（`01` §4.1） |
 | **worker 线程 + 队列** | 本路线统一桥接范式：`run_conversation` 在 worker 线程跑，回调只把事件 `queue.put`，主线程取队列渲染（`02` §3；最小骨架 `02` §6） |
-| **`_ThinkingSplitter`** | 示例代码里的辅助类，把推理增量与正文增量分流到界面两个区域。实现只在 `examples/01-hermes-desktop/Agent系统/agent_runtime/_chat.py:375`，参考文档不重述；它存在的必要来自 `01` §4.3 第 4 条 |
+| **`_ThinkingSplitter`** | 示例代码里的辅助类，把推理增量与正文增量分流到界面两个区域。实现只在 `examples/01-hermes-desktop/Agent系统/agent_runtime/_chat.py` 的 `class _ThinkingSplitter`，参考文档不重述；它存在的必要来自 `01` §4.3 第 4 条 |
 | **签名漂移** | 升级 `hermes-agent` 后 `AIAgent` 的参数或默认值与文档记录不一致。用 `scripts/check_api_signature.py` 对照 `scripts/api-baseline.json` 发现（`07` §2） |
 | **`hermes` vs `hermes-agent`** | PyPI 上两个**无关**包；正确装 `hermes-agent`，装错 `hermes` 会命令冲突 |
 | **三层工具面（按风险）** | 禁止面 / 受控写面 / 只读面，量的是"这个动作能不能做、要不要看着做"（`19` §3） |

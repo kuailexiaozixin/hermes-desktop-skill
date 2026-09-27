@@ -43,9 +43,10 @@ set HERMES_DESKTOP_HOME=C:\myapp\hermes_data      # Windows
 ```
 
 > 覆盖必须在**读取任何数据之前**生效（环境变量或 `启动.bat` 里设，不要设在业务代码中段）。
-> 两个变量分清楚：`HERMES_DESKTOP_HOME` 管底座自己的数据根（`hermes_config/_paths.py:348-363` 的
+> 两个变量分清楚：`HERMES_DESKTOP_HOME` 管底座自己的数据根（`Agent系统/hermes_config/_paths.py` 的
 > `get_hermes_home()`，覆盖分支排在冻结分支之前，**冻结态同样生效**）；`HERMES_HOME` 管 Library 内核，
-> 底座 `main.py:6-10` 用的是 `setdefault`，所以你外层先设它就让位。两句机制的完整来源见 `05` §3。
+> 底座 `Agent系统/main.py` 顶部那段 `if getattr(sys, "frozen", False):` 用的是 `setdefault`，
+> 所以你外层先设它就让位。两句机制的完整来源见 `05` §3。
 
 ---
 

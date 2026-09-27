@@ -54,7 +54,7 @@
 
 ## 3. 官方方式：配置与启动（方式 A）
 
-### 环境变量（0.19.0；`gateway/config.py:2006-2028` 逐个读取）
+### 环境变量（0.19.0；`gateway/config.py` 的 `_enable_from_env()` 等函数逐个读取）
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
@@ -66,11 +66,11 @@
 | `API_SERVER_MODEL_NAME` | profile 名 | `/v1/models` 的 model id |
 
 同一份配置也能写进 `config.yaml`，且**优先级更高**：适配层逐行按 `extra.get(键, 环境变量的回退值)` 取值
-（`api_server.py:943-953`），所以 `platforms.api_server.extra` 下的 `host` / `port` / `key` / `cors_origins` /
+（`gateway/platforms/api_server.py` 初始化 `self._host` 那一段，值取自 `extra.get("host", os.getenv("API_SERVER_HOST", ...))`），所以 `platforms.api_server.extra` 下的 `host` / `port` / `key` / `cors_origins` /
 `model_name` 会压过上面的 env；`model_routes`（一个实例服务多套上游模型）**只有这条配置路线，没有对应环境变量**。
 另有两项只认 `config.yaml`：并发上限 `gateway.api_server.max_concurrent_runs`（默认 10，填 `0` 关闭，超限时返回
-HTTP 429 + `Retry-After`；`api_server.py:1106-1127`），以及本平台的工具面 `platform_toolsets.api_server`
-（`api_server.py:1850`，解析函数在 `hermes_cli/tools_config.py:1721`）。
+HTTP 429 + `Retry-After`；`gateway/platforms/api_server.py` 的 `_resolve_max_concurrent_runs()`），以及本平台的工具面 `platform_toolsets.api_server`
+（`gateway/platforms/api_server.py` 内 `enabled_toolsets = sorted(_get_platform_tools(user_config, "api_server"))` 一句，解析函数是 `hermes_cli/tools_config.py` 的 `_get_platform_tools()`）。
 
 ### 启动与验证
 
@@ -173,7 +173,7 @@ hermes -p alice gateway &  hermes -p bob gateway &
 | ③ 头缺席时 | session id 退化为 `sha256(system_prompt + 首条 user 消息)` 截 16 hex、加 `api-` 前缀（`_derive_chat_session_id`，`:852-867`） | 匿名请求也有"稳定会话"。禁止把它当身份，更禁止用它派生数据范围 |
 | ④ profile 维 | URL 前缀 `/p/<profile>/` 解析（`_resolve_request_profile` `:1397-1471` + `_api_request_profile` ContextVar `:67`） | **唯一**能把请求分到不同配置与数据子树的机制；多租户靠它 + 各自端口/key（§3） |
 | ⑤ 绑进上下文 | `_bind_api_server_session()` 只写 `platform / chat_id / session_key / session_id`，**不写 `user_id`、`user_name`、principal**（`:4591-4620`，`finally` 清理 `:4698`） | 工具侧读 `HERMES_SESSION_USER_ID` 的地方（terminal/cron/kanban/send_message）在 API Server 形态下拿到空串 |
-| ⑥ 落到工具 | dispatch 只注入三个平铺 kwargs：`task_id`、`session_id`、`user_task`（`model_tools.py:1264-1278`，`tools/registry.py:614-632`）；`task_id = session_id or run_id`，同时是 file/terminal/sandbox 状态的 key | **没有 per-request context 对象**。`current_scope()` 只能自己在 handler 里拿 `session_id` 去查业务登录态——这正是 `19` §5 那条"范围由服务端推导"的落地位置 |
+| ⑥ 落到工具 | dispatch 只注入三个平铺 kwargs：`task_id`、`session_id`、`user_task`（`model_tools.py` 的 `_dispatch()`，`tools/registry.py` 的 `dispatch()`）；`task_id = session_id or run_id`，同时是 file/terminal/sandbox 状态的 key | **没有 per-request context 对象**。`current_scope()` 只能自己在 handler 里拿 `session_id` 去查业务登录态——这正是 `19` §5 那条"范围由服务端推导"的落地位置 |
 | ⑦ 实例与并发 | 每回合 `_create_agent()` 新建 `AIAgent`（`:4667-4676`、`:1858-1866`）；`gateway.api_server.max_concurrent_runs` 默认 10、`0` 关闭、**无 env 别名**，超限 429 `rate_limit_exceeded` + `Retry-After: 1`（`:4560-4588`） | 计数是**进程全局整数、不按身份分** → 一个租户能把另一个的请求全部打成 429；按人/按租户限流只能在你的反代层做（配额分层见 `21` §3） |
 
 **凭证生命周期**：key 只在**构造时**读一次（`:948`）→ **轮换必须重启进程**，未见热加载路径（R6，不宣称支持）。
@@ -190,11 +190,11 @@ hermes -p alice gateway &  hermes -p bob gateway &
   未设 = 该特性完全关闭、全盘无根限制。
 - 读侧同样有黑名单（`get_read_block_error` `:191-358`），且其 docstring 自己写着
   **"This is NOT a security boundary"**——terminal 与 Agent 同为一个 OS 用户，`cat auth.json` 依然走得通。
-- `terminal` 的 `workdir` 参数**只过 shell 元字符正则**（`_WORKDIR_SAFE_RE`，`tools/terminal_tool.py:293-315`），任意绝对路径都收；
-  所谓 workspace root（`tools/file_tools.py:272-303`）只用于产出一条**警告字符串**，写操作照做（`:1623-1631`）。
+- `terminal` 的 `workdir` 参数**只过 shell 元字符正则**（`_WORKDIR_SAFE_RE`，定义在 `tools/terminal_tool.py`），任意绝对路径都收；
+  所谓 workspace root（`tools/file_tools.py` 的 `_authoritative_workspace_root()`）只用于产出一条**警告字符串**，写操作照做（同文件里产出该警告的调用处）。
 - `create_custom_toolset` / MCP 侧也没有目录作用域：`tools/mcp_tool.py` 的 `args` 原样透传，
   限定目录是那个 MCP server 自己的事（它文档里 `/tmp` 只是示例）。
-- ⇒ 真隔离只有一条路：**换 terminal 后端**（`TERMINAL_ENV=docker|ssh|modal|...`，`tools/terminal_tool.py:1354-1470`），
+- ⇒ 真隔离只有一条路：**换 terminal 后端**（`TERMINAL_ENV=docker|ssh|modal|...`，`tools/terminal_tool.py` 的 `_get_env_config()`），
   §5 的沙箱告警就是冲着"`local` + 非本机绑定"这个组合去的。子 Agent 之间也不构成隔离，见 `21` §4 的文件作用域那一条。
 
 > **一句话结论**：API Server 提供的身份能力止于"这把 key + 这个会话 id + 这个 profile"。

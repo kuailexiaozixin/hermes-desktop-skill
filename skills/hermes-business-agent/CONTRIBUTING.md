@@ -14,7 +14,7 @@
 1. **事实必须核实**：任何对 Hermes API / 行为的断言，需经官方文档 `hermes-llms-full.txt` 或 `hermes-agent==0.19.0` 源码核实，并在 `references/00-index.md` 登记事实基线。
 2. **修改前备份**：改动 `SKILL.md` / `references/` 前先备份原文件。
 3. **版本联动**：改动技能后 bump `SKILL.md` 的 `version`，并在 `CHANGELOG.md` 追加对应条目（`version` 必须与 CHANGELOG 最新一致）。
-4. **过门禁**：提交前跑 `scripts/quality_check.py`（6 步）与 `scripts/check_skill_gate.py`，全绿再提交。
+4. **过门禁**：提交前跑 `scripts/quality_check.py`（7 步）与 `scripts/check_skill_gate.py`，全绿再提交。
 5. **上游漂移**：官方文档更新时运行 `scripts/track_upstream.py`，用 `--update-docs` 同步 `hermes-llms-full.txt` 并更新 `references/docs-baseline.json`。
 6. **不提交敏感信息**：`.sesskey`、`.env`、`HERMES_HOME` 等一律被 `.gitignore` 排除，勿误提交。
 

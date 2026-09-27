@@ -22,10 +22,10 @@
 - **与 15 的边界**：`15-api-server.md` 讲 API Server **如何使用/如何接入**（判据/配置/端点/认证/进程内自建）；本文只负责 `gateway` 包**有哪些模块、各自干什么**这一层，不重复能力语义。
 - **与 14 的边界**：`14-library-infra.md` §1 曾把 `gateway` 作为基础设施一行列出并给出「为什么进程内不用」；本文把该包**内部 77 个模块逐一枚举**，两者互补，`14` §1 gateway 行已改为指向本文。
 
-## 1. 全量模块清单（77 个，按子包/顶层分组，不交叉不重合）
+## 1. 全量模块清单（73 个模块行，按子包/顶层分组，无重复条目）
 
-> 每行：模块 | 真实用途（取自 0.19.0 docstring）| 代表公开 API（仅列真实存在者）。
-> `gateway` 子包 = `platforms`（平台适配器）/ `relay`（实验性中继）/ `builtin_hooks`（内置钩子）；顶层 42 个功能模块。
+> 每行：模块 | 真实用途（取自 0.19.0 docstring）| 代表 API（只列源码里真实存在的名字，其中包含模块内部实现用的下划线开头名，便于源码定位）。
+> 数量口径：`gateway` 包共 77 个 `.py`；扣除包根 `gateway/__init__.py` 为 76 个；再扣除 `platforms` / `platforms/qqbot` / `relay` 三个子包的 `__init__.py`（它们没有可列举的顶层定义，由 §1.2 / §1.3 / §1.4 的分组标题代表）＝表内 73 行。`gateway` 子包 = `platforms`（平台适配器）/ `relay`（实验性中继）/ `builtin_hooks`（内置钩子）；顶层 42 个功能模块。
 
 ### 1.1 (top)（42 个）
 
@@ -103,7 +103,7 @@
 | --- | --- | --- |
 | `gateway.platforms.qqbot.adapter` | QQ Bot platform adapter using the Official QQ Bot API (v2). | QQCloseError, QQAdapter |
 | `gateway.platforms.qqbot.chunked_upload` | QQ Bot chunked upload flow. | UploadDailyLimitExceededError, UploadFileTooLargeError, _UploadProgress, _PreparePart |
-| `gateway.platforms.qqbot.constants` | QQBot package-level constants shared across adapter, onboard, and other modules. | — |
+| `gateway.platforms.qqbot.constants` | QQBot package-level constants shared across adapter, onboard, and other modules. | API_BASE, GATEWAY_URL_PATH, DEFAULT_API_TIMEOUT, FILE_UPLOAD_TIMEOUT, MAX_MESSAGE_LENGTH, DEDUP_WINDOW_SECONDS |
 | `gateway.platforms.qqbot.crypto` | AES-256-GCM utilities for QQBot scan-to-configure credential decryption. | generate_bind_key, decrypt_secret |
 | `gateway.platforms.qqbot.keyboards` | QQ Bot inline keyboards + approval / update-prompt senders. | KeyboardButtonPermission, KeyboardButtonAction, KeyboardButtonRenderData, KeyboardButton |
 | `gateway.platforms.qqbot.onboard` | QQBot scan-to-configure (QR code onboard) module. | BindStatus |
@@ -123,15 +123,15 @@
 
 | 模块 | 用途 | 代表 API |
 | --- | --- | --- |
-| `gateway.builtin_hooks` | Built-in gateway hooks that are always registered.（内置钩子，恒注册） | — |
+| `gateway.builtin_hooks` | Built-in gateway hooks that are always registered.（内置钩子，恒注册） | 无（该子包的 `__init__.py` 只有 docstring；注册逻辑是 `gateway/hooks.py` 的 `_register_builtin_hooks()`）|
 
 ## 2. 平台适配器真面目（双轨：内置核心 + 插件平台）
 
 > **0.19.0 网关平台适配器是「双轨」架构**，不要只看 `gateway/platforms/`（内置核心）。
 > **插件平台在 `plugins/platforms/*`**（每个 `adapter.py + plugin.yaml`，`kind: platform`）；
-> `hermes_cli/gateway.py:5232` 的原话是 `Bundled platform plugins (kind: platform) auto-load unconditionally`
+> `hermes_cli/gateway.py` 的 `_all_platforms()` 处原话是 `Bundled platform plugins (kind: platform) auto-load unconditionally`
 > （内置插件平台无条件自动加载，无需 enable 步骤，另见同文件 `:6134`）。
-> 且 `gateway/run.py:9742` 的 `_create_adapter()` **先查 `platform_registry`（插件优先），再回退内置 legacy if/elif**
+> 且 `gateway/run.py` 的 `_create_adapter()` **先查 `platform_registry`（插件优先），再回退内置 legacy if/elif**
 > ——其 docstring 与插件分支就在 `:9748-9750` 与 `:9762`。
 > 官方 `Platform` 枚举（`gateway/config.py`）显式声明 telegram/discord/whatsapp/slack/matrix/mattermost/homeassistant/email/sms/dingtalk/feishu/wecom 等成员，
 > 其余插件平台（irc/line/simplex/photon/google_chat/raft/ntfy/teams）经 `_scan_bundled_plugin_platforms()` 扫描 `plugins/platforms/*/plugin.yaml` 动态注册。

@@ -102,7 +102,7 @@
 但它的起始 cwd **由父播种**（`:1961-1963` `record_session_cwd(child_task_id, get_session_cwd(parent))`），
 且父子同在一个宿主文件系统、同一份写白名单（`HERMES_WRITE_SAFE_ROOT`，默认可见即全盘）之下
 ——**换 task_id 不等于换根目录**。并发写同一文件有检测（父子 `known_reads` 快照比对，`:2233-2239`），那只是撞车告警，不是隔离。
-per-task 可覆写的只有 `terminal` 后端的镜像与 cwd（`register_task_env_overrides`，`tools/terminal_tool.py:1125`），
+per-task 可覆写的只有 `terminal` 后端的镜像与 cwd（`tools/terminal_tool.py` 的 `register_task_env_overrides()`），
 **没有 per-task 密钥**：子 Agent 要用不同凭证，只能靠 profile / 独立 `.env`（`06` §9.5）或干脆拆进程。
 ⇒ 上面这些维度（上下文、工具面、状态与产物、完成条件、**文件作用域**、**访问凭证**）里，
 后两维要真隔离，做法是把动作推到不同**进程/容器**，禁止靠拆子 Agent 达成。

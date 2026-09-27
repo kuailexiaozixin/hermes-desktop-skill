@@ -1,5 +1,93 @@
 # CHANGELOG
 
+## [1.32.0] — 2026-09-27
+
+两条线：给 `22` 补上跨轮那一层（多轮编排），把"单轮跑完之后谁判定继续、验收面在哪、预算封在哪、状态存在哪"写成可核对的一节；全库把行号引用改成符号名定位，并写明这条规则的两处例外。
+
+- **`22` 新增 §9 多轮编排**（九小节）：落点是 `hermes_cli/goals.py`（模块 docstring 自称 "Persistent session goals"）。
+  9.1 用五拍表给出一圈的转法——`/goal` 设目标 → 走 `agent/conversation_loop.py` 执行一轮 →
+  `judge_goal()` 判该不该继续 → 续轮提示作普通 user 消息追加 → `GoalState` 存 SessionDB 的 `state_meta` 表（键 `goal:<session_id>`），
+  并点出 docstring 明写的那条前提：续轮不改系统提示、不换工具集，所以提示缓存不被打断。
+  9.2 记 `GoalContract` 的五个字段（`_CONTRACT_FIELDS`：outcome / verification / constraints / boundaries / stop_when）、
+  `parse_contract()` 的行内语法与 `_CONTRACT_ALIASES` 的二十多个别名、`/goal draft` 经 `draft_contract()` 自动展开
+  （失败回落到无契约的自由目标）；同讲一份契约如何同时约束执行方与验收方。
+  9.3 记 judge 是**四值**（done / continue / wait / skipped）而非二值，并展开 `wait` 的三种载荷
+  （`wait_on_session` / `wait_on_pid` / `wait_for_seconds`）、`evaluate_after_turn()` 在等待期不消耗轮次不调 judge 的短路，
+  以及 `JUDGE_SYSTEM_PROMPT` 里"不要因为还有活没干就选 WAIT"这条反滥用约束。
+  9.4 把三层预算分清（`DEFAULT_MAX_TURNS` 20 轮 / 父 `max_iterations` 90 步 / 子 `delegation.max_iterations` 50 步），
+  并写明父子合计可超出父上限、`execute_code` 的迭代经 `refund()` 退还。
+  9.5 记 fail-open 的理由与两道刹车（`DEFAULT_MAX_CONSECUTIVE_PARSE_FAILURES` 3、
+  `DEFAULT_MAX_CONSECUTIVE_TRANSPORT_FAILURES` 5），并明确指出这组设计**只防发散、不防收敛到错误状态**。
+  9.6 记 `auxiliary.goal_judge` 的默认 `provider` 是 `"auto"`（即主模型），独立性要显式配才拿得到。
+  9.7 给一张"需求 × 0.19.0 现状"的判据表，其中定时触发标"部分"（`cron/scheduler.py` 是独立体系，与 `/goal` 不联动），
+  发现信号源与子代理目录级隔离两行标"无"，并提示不要用"grep 不到 git worktree"就下隔离结论。
+  9.8 把本节与 §2/§4/§8/§20 的关系接上。同步接线：`00-index` §2 路线行、§3 第 ③ 步行、§5 反查索引三处，
+  `22` 自身 §2 部件表第 12 行与 §7 步骤对应表各增一条。
+- **行号引用改为符号名定位**：`references/`、`docs/`、`SKILL.md` 里 89 处 `文件.py:行号` 全部改为
+  文件 + 函数名 / 类名 / 常量名（如 `agent/agent_init.py` 的 `init_agent()` 内、`hermes_cli/config.py` 的
+  `DEFAULT_CONFIG["compression"]`）。行号随上游每次改动整体漂移，符号名不会。`22` §10 写明这条规则的边界：
+  余下带行号的只落在两处且都不受其约束——`references/api-reference/` 是从上游 docstring 逐字转录的产物（改它等于篡改被引材料），
+  `CHANGELOG.md` 条目里的行号记录的是当时那次核对的位置（重写等于伪造历史）。
+
+## [1.31.0] — 2026-09-26
+
+三条线：新增一份 Agent Harness 技术解读；把 `10` / `11` / `12` / `13` / `16` 里「与已装包对账」的清单与数量声明校正到逐条可核对，并把这份核对做成常设门禁；执行上游文档漂移跟踪并把刷新结果同步到全部引用处。
+
+- **新增 `22-harness-engineering.md`**：把 hermes-agent 的内核层拆成 12 件
+  （模型调用循环 / 上下文组装与压缩 / 工具面与执行 / 权限与审批闸门 / 会话与状态 / 记忆 / 子代理与调度 /
+  技能与插件 / MCP / 事件与流式输出 / 观测与用量 / 配置与生命周期），逐件给出包内落地文件与 `路径:行号`；
+  再按可改边界分三档——A 配置行（改 `config.yaml` 或环境变量即生效）、B 扩展面（Skill / MCP / Plugin /
+  Memory backend，不动源码）、C 改源码（`run_agent` 与 `agent/*`、`tools/*` 内核，须走 `07` 的改核定档流程）。
+  主技能第 ⑤ 步在「把业务动作变成工具面」处指向该文件的部件定位表。登记四处：`check_skill_gate.py` 的 EXPECTED、
+  `00-index` §2 路线行 + §3 反查索引 + §5 单点依据行、`README` 文档计数 22→23。
+- **`10` §2 的「代表 API」列全量校正**：150 行里有 117 行的第三列写了源码中不存在的名字（`OneshotSession` /
+  `ConsoleEngine` / `AuthStore` / `MODELS` / `WebServer` / `KanbanBoard` 等），另有 1 行整行虚构
+  （`memory_providers` 模块与 `ProviderSpec` 这个类在包里都找不到），42 处 `（251F/96C）` 式的规模标注无法用任何
+  `ast` 口径复现。现在 157 行逐行过 `ast`：列出的每个名字都在该模块自身命名空间里（顶层 def / class / 赋值 /
+  `__all__`，含写在顶层 `if` / `try` / `with` 块内的定义），子包取 `__init__.py` 的再导出；`subcommands` 一行改用
+  `组内文件.py::名()` 形式，判定规则同步写进 §2 前言。§2 前言另把「逐模块 import 核实」改成实际的静态解析口径——
+  `hermes_cli` 的模块在 import 阶段会碰 TTY 与凭据，不能靠 import 取证。§3 三段样例补回真实签名：
+  `resolve_moa_preset(config, name)`、`create_quick_snapshot(label=…)`、`cron_command()` 与其下的纯函数。
+- **`12` / `13` / `16` 按同一规则复核**：`12` 补 5 行空缺的「代表 API」（`tools.environments` 等，名字实测在包内）；
+  `13` 补 3 行，并把一个全私有模块的 `—` 写成「无公开名（顶层 20 个定义全部以 `_` 开头）」；`16` §1 标题原写
+  「77 个」而表内实际 73 行——`gateway` 共 77 个 `.py`，扣包根为 76，再扣三个没有顶层定义的子包 `__init__.py`
+  （由分组标题代表）＝73，这个换算已写成一句可核对的话。
+- **数量口径统一**：`hermes_cli` 的顶层条目在 `01` / `02` / `00-index` / `14` 里被写成「146 个顶层模块」和
+  「147 个顶层模块」两种，都不等于实测的 146 个模块文件 + 3 个子包 = 149 个条目（含嵌套 205 个 `.py`，
+  两个口径都不含包根 `__init__.py`）。「不遗漏、不重复、不交叉」这类无法证伪的说法改成实测事实：149 个条目全覆盖，
+  8 个跨主题模块在两个主题组各出现一次，第二处只留指针。
+- **`11` / `12` / `13` / `14` 的口径与取证方式校正**：`12` / `13` 头部把「含顶层在内的总数」说成「113 / 155 个**嵌套**子模块」，
+  实测拆分是 `tools` 顶层 94 + 子包内 19、`agent` 顶层 116 + 子包内 39，`14` 的两行同改。这两份头部另声称核实方法是
+  「逐模块 import」——而 `tools` 下 34 个模块（其中 32 个在模块顶层直接 `register(...)`）、`agent` 下 6 个模块在 import 期
+  就改动注册表，逐模块 import 既不成立也不该做，改成实际的 `ast` 静态解析并写出依据。`11` §9 的一处去重举例失真：
+  `['browser','terminal']` → 15 个是两集无重合直接相加，被去重的 `web_search` 属于 `['browser','web']` → 14 个那一例，
+  两组数字都跑 `toolsets` 核对过（`browser` 13 / `terminal` 2 / 合并 15）。`11` §0 的「本文模块均可放心 import」补正为
+  逐条列出 import 期动作：`hermes_logging` 替换全局 record factory、`hermes_bootstrap` 直接执行 UTF-8 引导、
+  `model_tools` import 全量内置工具、`trajectory_compressor` 读环境文件。`11` 各节「**规模**：N 类 / M 函数」原先未写口径，
+  按含私有名的读法与源码对不上，现补「顶层定义且名字不以下划线开头」这一句——10 条声明按此口径逐条实测一致。
+- **新门禁 `scripts/check_module_tables.py`（`quality_check.py` 第 7 段）**：上述清单逐行与已装包对账，
+  另核对分组标题的「（N 个）」是否等于该组行数、文档口径数是否等于磁盘实测、`11` 的「规模」声明是否等于源码实测数。
+  未装 `hermes-agent` 时退出码 2，该段降级为跳过。检出力用注入法验证过：改坏一个模块名、一个 API 名、一个「规模」数
+  各报一处，还原后全绿。
+- **上游文档漂移跟踪已执行（`scripts/track_upstream.py --update-docs`）**：② 文档线从 91,898 行 / 5,005,104 bytes
+  （md5 `5aaa2288…`）更新到 **96,443 行 / 5,300,990 bytes**（md5 `aaad273c…`），新指纹写入 `references/docs-baseline.json`，
+  旧文档备份在临时目录；① PyPI 版本、③ 源码签名、④ api-reference 三条线全部仍为 OK / 0.19.0——**动的是文档，不是代码**。
+  结构性变化集中在安装与分发（macOS 应用包、共享 bundle、MSIX/App Installer、容器镜像烘焙、Docker/s6、源码安装切换）、
+  桌面端 host bridge 设置面、插件 feed 契约与运行中加载、TLS 证书信任、`HERMES_HOME` 存活契约、发布与 canary 标识。
+  两处**文档跑在锁定的 0.19.0 之前**已核实：文档里的 `hermes pm` 子命令与 `setup` 工具集在本机包里都不存在
+  （无 `hermes_cli/subcommands/pm.py`、`add_parser("pm")` 无匹配，`TOOLSETS` 仍 57 集且不含该键），按红线 R6 只登记不采信。
+  引用处同步五处：`00-index` §1 基线行改 96,443 行 / 5.3 MB；§1.1 检索地图里失效的 `Configure a model`
+  （原指向 Android/Termux 一页的小节，该页本次被重写）换成新文档内可 grep 到的 `Choose a Provider` / `hermes model` /
+  `Configuration Precedence` / `Environment Variable Substitution`；§2 「搜 `self-improv` 命中 20 行」按实测改 19 行；
+  `02` §10 那条「原话 `"Drop it in ~/..."`」改成文档原文；`check_skill_gate.py` 注释里复述的基线字节数删除（真相只在 sidecar）。
+- **`22` 去除对外部材料的引用，改写为自足文档**：原 §5 是一张六篇文章的标题 / 作者 / 日期对照表，另有四处正文以
+  「外部文章说……」起头。这些材料本机不可获取、不可核对，留在参考文档里等于给下游一个无法验证的依据，整节按
+  「取材规则：能在源码里翻到位置或在本机跑出返回值的才写进判据」重写为三格（分层轴的取舍与可判别性、通道侧与知识侧的分工、
+  三类不进入判据的数字），§2 / §3 / §4.2 / §6 的四处引用一并改成本篇自己的判据；`19` §4 的「外面文章里常见的五层」同步改中性说法。
+  顺带重测 `22` §1 的词频：原文「包源码里 12 处」在任何口径下都无法复现，现按 RECORD 的 793 个 `.py` 实测为
+  **18 个文件 / 38 行**，并写出三档归类（后台 review 轮 20 行、test harness 10 行、其余 8 行）与文档侧 23 行 / 26 次的口径。
+  **教训：参考文档不得引用读者取不到、也核不了的原材料；需要保留的只有从中提炼出的可判别结论，且结论必须自带核对方法。**
+
 ## [1.30.0] — 2026-09-23
 
 业务语义补齐三格。触发是对一篇《从 DDD 到本体论》的文章做缺口核对：它的七层元模型与我们的七站**正交**——
@@ -849,7 +937,7 @@
 
 
 
-  - §7.2 审批护栏：approval / write_approval / path_security / threat_patterns / tool_guardrails / slash_confirm 模块与符号全部核实存在；`_tool_use_enforcement` 为动态实例属性（agent_init.py:1532 设置、system_prompt.py:266 使用），断言成立；§7.3 确认无 `tools.office`/`tools.excel_tools`。
+  - §7.2 审批护栏：approval / write_approval / path_security / threat_patterns / tool_guardrails / slash_confirm 模块与符号全部核实存在；`_tool_use_enforcement` 为动态实例属性（`agent/agent_init.py` 的 `init_agent()` 内设置、`agent/system_prompt.py` 的系统提示构建处读取），断言成立；§7.3 确认无 `tools.office`/`tools.excel_tools`。
 
 
 
@@ -857,7 +945,7 @@
 
 
 
-  - §11 `hermes mcp add` 参数集：name/--url/--command/--args(REMAINDER)/--auth(oauth|header)/--preset/--connect-timeout/--env 全部核实存在且语义一致（mcp.py:44-72）。
+  - §11 `hermes mcp add` 参数集：name/--url/--command/--args(REMAINDER)/--auth(oauth|header)/--preset/--connect-timeout/--env 全部核实存在且语义一致（`hermes_cli/subcommands/mcp.py` 的 `mcp_add_p` 参数段）。
 
 
 
@@ -1321,7 +1409,7 @@
 
 
 
-  - **② MCP server**：`hermes mcp add <name> --url|--command --args --auth --preset --env`（核实 `subcommands/mcp.py:41-73`）——FastMCP 写独立 server，零 Hermes 源码。
+  - **② MCP server**：`hermes mcp add <name> --url|--command --args --auth --preset --env`（核实 `hermes_cli/subcommands/mcp.py` 的 `mcp_add_p` 参数段）——FastMCP 写独立 server，零 Hermes 源码。
 
 
 
@@ -1329,7 +1417,7 @@
 
 
 
-  - **③ Plugin**：`~/.hermes/plugins/<name>/`（`plugin.yaml`+`register(ctx)`），`ctx.register_tool(override=...)` 受 `allow_tool_override` 信任门约束，`ctx.llm` 为宿主 LLM facade（核实 `plugins.py:10,349,389,470`）。
+  - **③ Plugin**：`~/.hermes/plugins/<name>/`（`plugin.yaml`+`register(ctx)`），`ctx.register_tool(override=...)` 受 `allow_tool_override` 信任门约束，`ctx.llm` 为宿主 LLM facade（核实 `hermes_cli/plugins.py` 模块 docstring 的四来源清单，以及 `class PluginContext` 的 `register_tool()`、`llm` 属性与配置读取段）。
 
 
 
@@ -1337,7 +1425,7 @@
 
 
 
-  - **④ Memory backend**：`MemoryProvider` ABC（`agent/memory_provider.py:43`），内置 `builtin`/可插拔 `honcho`/`hindsight`/`openviking`，切换/新增走声明式配置（`memory_providers.py:7`）或自写 `MemoryProvider` 插件——不改核。
+  - **④ Memory backend**：`MemoryProvider` ABC（`agent/memory_provider.py` 的 `class MemoryProvider(ABC)`），内置 `builtin`/可插拔 `honcho`/`hindsight`/`openviking`，切换/新增走声明式配置（`Agent系统/memory_providers.py` 的 `get_active_provider()`）或自写 `MemoryProvider` 插件——不改核。
 
 
 
@@ -5025,7 +5113,7 @@
 
 
 
-  - **研究结论（hermes-agent 0.18.2 实证）**：MOA = Hermes **虚拟 provider（"moa"）**——多个 `reference_models`（参考/顾问模型）各自给建议，再由一个 `aggregator`（聚合/执行模型）综合成最终回答；**不是独立命令**，而是当 `AIAgent(provider="moa", model=<预设名>)` 时，`AIAgent.__init__`（`agent/agent_init.py:816`）自动构造 `MoAClient` 接管每次 LLM 调用。配置落 **`config.yaml` 的 `moa` 键**，结构是「命名预设(presets)」：`default_preset`/`active_preset`/`presets/<name>/{enabled, reference_models:[{provider,model}], aggregator:{provider,model}, reference_temperature, aggregator_temperature, max_tokens, reference_max_tokens, fanout}`；`fanout` ∈ {`per_iteration`(每轮工具迭代重跑), `user_turn`(每轮用户对话跑一次)}。内核 API（`hermes_cli/moa_config.py`）：`normalize_moa_config`/`resolve_moa_preset`/`set_active_moa_preset`/`list_moa_presets`/`exact_moa_preset_name`/`DEFAULT_MOA_PRESET_NAME="default"`/`MOA_MARKER_PREFIX="__HERMES_MOA_TURN_V1__"`/`encode_moa_turn`（一次性 `/moa` 标记串 base64，单条试跑不切换活动模型）；引擎（`agent/moa_loop.py`）：`MoAChatCompletions`（OpenAI-chat 兼容 facade，经 `reference_callback` 在聚合前透出每个参考模型回答）/`MoAClient`(`.chat.completions` 包装)；`agent_init.py:816-864` 经 `_moa_reference_relay` 把 facade 的 `"moa.reference"`/`"moa.aggregating"` 事件转发到 `agent.tool_progress_callback`（参数：`("moa.reference", label, text, None, moa_index=, moa_count=)` / `("moa.aggregating", aggregator, None, None, moa_ref_count=)`）；`agent/conversation_loop.py:555` 的 `decode_moa_turn` 自动识别一次性标记串跑单轮后恢复原模型。默认预设：`reference_models=[{openai-codex,gpt-5.5},{openrouter,deepseek/deepseek-v4-pro}]`、`aggregator={openrouter,anthropic/claude-opus-4.8}`。
+  - **研究结论（hermes-agent 0.18.2 实证）**：MOA = Hermes **虚拟 provider（"moa"）**——多个 `reference_models`（参考/顾问模型）各自给建议，再由一个 `aggregator`（聚合/执行模型）综合成最终回答；**不是独立命令**，而是当 `AIAgent(provider="moa", model=<预设名>)` 时，`AIAgent.__init__`（`agent/agent_init.py` 的 `init_agent()` 内）自动构造 `MoAClient` 接管每次 LLM 调用。配置落 **`config.yaml` 的 `moa` 键**，结构是「命名预设(presets)」：`default_preset`/`active_preset`/`presets/<name>/{enabled, reference_models:[{provider,model}], aggregator:{provider,model}, reference_temperature, aggregator_temperature, max_tokens, reference_max_tokens, fanout}`；`fanout` ∈ {`per_iteration`(每轮工具迭代重跑), `user_turn`(每轮用户对话跑一次)}。内核 API（`hermes_cli/moa_config.py`）：`normalize_moa_config`/`resolve_moa_preset`/`set_active_moa_preset`/`list_moa_presets`/`exact_moa_preset_name`/`DEFAULT_MOA_PRESET_NAME="default"`/`MOA_MARKER_PREFIX="__HERMES_MOA_TURN_V1__"`/`encode_moa_turn`（一次性 `/moa` 标记串 base64，单条试跑不切换活动模型）；引擎（`agent/moa_loop.py`）：`MoAChatCompletions`（OpenAI-chat 兼容 facade，经 `reference_callback` 在聚合前透出每个参考模型回答）/`MoAClient`(`.chat.completions` 包装)；`agent_init.py` 内 `_moa_reference_relay()` 把 facade 的 `"moa.reference"`/`"moa.aggregating"` 事件转发到 `agent.tool_progress_callback`（参数：`("moa.reference", label, text, None, moa_index=, moa_count=)` / `("moa.aggregating", aggregator, None, None, moa_ref_count=)`）；`agent/conversation_loop.py` 轮内调 `decode_moa_turn` 自动识别一次性标记串跑单轮后恢复原模型。默认预设：`reference_models=[{openai-codex,gpt-5.5},{openrouter,deepseek/deepseek-v4-pro}]`、`aggregator={openrouter,anthropic/claude-opus-4.8}`。
 
 
 
@@ -6281,7 +6369,7 @@
 
 
 
-  - **验证全绿**：`node --check` 9 文件全过；`smoke.mjs` MODULE GRAPH OK；`test_util` 20/0、`test_api` 15/0；`py_compile main.py` 通过；`static_path` 递归服务 `/src/*.js` 经 `main.py:101,377` 注释确认。SKILL.md version → 1.4.15。
+  - **验证全绿**：`node --check` 9 文件全过；`smoke.mjs` MODULE GRAPH OK；`test_util` 20/0、`test_api` 15/0；`py_compile main.py` 通过；`static_path` 递归服务 `/src/*.js` 经 `routes/__init__.py` 头部约束 1 与 `server.py` 的 `FastApp(...)` 参数确认。SKILL.md version → 1.4.15。
 
 
 
@@ -6857,7 +6945,7 @@
 
 
 
-  - **关键发现（复验抓出过时误判）**：重新逐行读真实代码后，上一份批判报告中的多数条目**在当前磁盘代码里已修复**，属误判——逐项核对证据：`app.js:1736-1737`（掩码跳过守卫，A1/A2 已修）、`app.js:1552-1553`（二次确认，B3 已修）、`app.js:1816` 用后端下发 `ts.dangerous`（B4 已修）、`app.js:1533-1534`（排序持久化 `window._toolSortQuery`，C1 已修）、`main.py:704` 路由已是 `/api/toolsets/toggle`（B1 路由已修）、`agent_runtime.py:1014` 注释表明 `configure_toolset` 已改用 `update_config_yaml` 与 `set_toolset_disabled` 统一写路径（B2 已修）、`app.js:1876-1879` 已是标准 SSE 解析（`buf.split("\n\n")` + 过滤注释行 + 拼接多行 data，C2 已修）、`app.js:1692-1697` 已有「复制安装指引」按钮（C3 已修）。**未盲改这些已修复项，避免制造无意义 churn**。
+  - **关键发现（复验抓出过时误判）**：重新逐行读真实代码后，上一份批判报告中的多数条目**在当前磁盘代码里已修复**，属误判——逐项核对证据：`app.js:1736-1737`（掩码跳过守卫，A1/A2 已修）、`app.js:1552-1553`（二次确认，B3 已修）、`app.js:1816` 用后端下发 `ts.dangerous`（B4 已修）、`app.js:1533-1534`（排序持久化 `window._toolSortQuery`，C1 已修）、`routes/toolsets.py` 的 `api_toolset_toggle()` 路由已是 `/api/toolsets/toggle`（B1 路由已修）、`agent_runtime/_toolsets.py` 的 `configure_toolset()` 注释表明它已改用 `update_config_yaml` 与 `set_toolset_disabled` 统一写路径（B2 已修）、`app.js:1876-1879` 已是标准 SSE 解析（`buf.split("\n\n")` + 过滤注释行 + 拼接多行 data，C2 已修）、`app.js:1692-1697` 已有「复制安装指引」按钮（C3 已修）。**未盲改这些已修复项，避免制造无意义 churn**。
 
 
 
@@ -6865,7 +6953,7 @@
 
 
 
-  - **唯一真实 bug（已修）**：`main.py:732` 的 `api_toolset_batch` 端点调用 **不存在的** `ar.set_tool_disabled`（该函数此前已整体重命名为 `set_toolset_disabled`，定义在 `agent_runtime.py:1354`，但批量端点漏改）→ 「全部启用/全部禁用」按钮会 `AttributeError` 崩溃。改为 `ar.set_toolset_disabled(n, disabled)`（签名一致）。
+  - **唯一真实 bug（已修）**：`routes/toolsets.py` 的 `api_toolset_batch()` 端点调用 **不存在的** `ar.set_tool_disabled`（该函数此前已整体重命名为 `set_toolset_disabled`，定义在 `agent_runtime/_toolsets.py` 的 `set_toolset_disabled()`，但批量端点漏改）→ 「全部启用/全部禁用」按钮会 `AttributeError` 崩溃。改为 `ar.set_toolset_disabled(n, disabled)`（签名一致）。
 
 
 
@@ -6873,7 +6961,7 @@
 
 
 
-  - **验证**：`py_compile examples/01-hermes-desktop/main.py` 退出 0；grep 确认 `set_toolset_disabled` 现被 `main.py:707`（toggle）与 `main.py:732`（batch）**两处一致调用**，`set_tool_disabled` 在 live 代码中已无残留（仅时间戳 `.bak.20260807-1500` 备份含旧名，未动）。
+  - **验证**：`py_compile examples/01-hermes-desktop/main.py` 退出 0；grep 确认 `set_toolset_disabled` 现被 `api_toolset_toggle()` 与 `api_toolset_batch()` **两处一致调用**，`set_tool_disabled` 在 live 代码中已无残留（仅时间戳 `.bak.20260807-1500` 备份含旧名，未动）。
 
 
 
@@ -7129,7 +7217,7 @@
 
 
 
-  - **C1 references 函数名误植**：`references/01-library-api.md:323` 误写 `stream_agent`，真实函数为 `stream_agent_chat`（已核实 `examples/01-hermes-desktop/agent_runtime.py:593`；`tkinter_minimal/README.md:18` 亦用此名）。改回 `stream_agent_chat`。
+  - **C1 references 函数名误植**：`references/01-library-api.md:323` 误写 `stream_agent`，真实函数为 `stream_agent_chat`（已核实 `Agent系统/agent_runtime/_chat.py` 的 `stream_agent_chat()`；`tkinter_minimal/README.md` 亦用此名）。改回 `stream_agent_chat`。
 
 
 

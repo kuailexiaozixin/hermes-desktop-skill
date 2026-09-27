@@ -8,7 +8,7 @@
 
 ## 1. 工具集系统
 
-- 注册表：`from toolsets import TOOLSETS`（顶层模块 `toolsets.py:96`；`tools.delegate_tool` 只是 `from toolsets import TOOLSETS` 再导出，不是定义处）。
+- 注册表：`from toolsets import TOOLSETS`（顶层模块 `toolsets.py` 的 `TOOLSETS`；`tools.delegate_tool` 只是 `from toolsets import TOOLSETS` 再导出，不是定义处）。
 - 结构：每项 = `{ "description": str, "tools": list[str], "includes": list[str] }`。
 - 总数 **57** = **33 个 capability** + **24 个 `hermes-*` 集成**。
 - 指令口径（减法原则，见 `01` §3.2）：`enabled_toolsets=None` 启用全部；用

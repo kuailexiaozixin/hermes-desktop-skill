@@ -8,9 +8,9 @@
 
 **Python 版本是硬约束，不是建议**：wheel 元数据 `Requires-Python: <3.14,>=3.11`（`hermes_agent-0.19.0.dist-info/METADATA:7` 实测）。
 3.10 与 3.14 都会被 pip 直接拒装、不会退化成警告，报错原文含 `requires a different Python`
-（pip 源码两条消息：`pip/_internal/resolution/legacy/resolver.py:106` 的
+（pip 源码两条消息：`pip/_internal/resolution/legacy/resolver.py` 的 `_check_dist_requires_python()` 里
 `Package '<name>' requires a different Python: <版本> not in '<3.14,>=3.11>'`，与
-`pip/_internal/index/package_finder.py:91` 的 `Link requires a different Python (...)`）。
+`pip/_internal/index/package_finder.py` 的 `_check_link_requires_python()` 里 `Link requires a different Python (...)`）。
 
 ```bash
 python -m venv venv
@@ -82,8 +82,8 @@ venv\Scripts\python -m pip install "hermes-agent[web]==0.19.0"
 - 触碰出厂数据前必须**备份 → 变更 → 还原 → md5 校验**（见 `07` §3 运行数据保护）。
 - 不杀用户正在运行的 EXE。
 
-参考实现的钉根写法（`examples/01-hermes-desktop/Agent系统` 的 `main.py:6-10`、`server.py:23-28`、
-`launcher.py:168-173`、`routes/__init__.py:53-58` 四处，全部在任何 hermes 导入之前）：
+参考实现的钉根写法（`examples/01-hermes-desktop/Agent系统` 的 `main.py` 顶部 `on_hello` 段、`server.py` 顶部的 `AuthenticateResponse` 导入段、
+`launcher.py` 与 `routes/__init__.py` 两处 "冻结态（PyInstaller）：HERMES_HOME 必须在任何 hermes 导入前指向可写路径" 注释下的 `if getattr(sys, "frozen", False):` 块，四处全部在任何 hermes 导入之前）：
 
 ```python
 if getattr(sys, "frozen", False):

@@ -1,7 +1,10 @@
 # 13 · `agent` 包参考（Hermes 运行时内核，0.19.0：全量模块枚举 + 六项深度主题）
 
-> 本文件是 `agent` 包的**完整、逐模块枚举**。经 `hermes-agent==0.19.0` 已装包**逐模块 import + 读取 docstring + 提取公开 API** 核实；
-> 全部 155 个嵌套子模块无一遗漏（含 `lsp.*` / `pet.*` / `secret_sources.*` / `transports.*` 等子包）。
+> 本文件是 `agent` 包的**完整、逐模块枚举**。经 `hermes-agent==0.19.0` 已装包**逐模块读取 docstring + 用 `ast` 提取顶层公开名**核实；
+> 全程静态解析源码，不 `import`——`agent` 下 6 个模块在 import 期就自执行（`credential_sources._register_all_sources()`、
+> `jiter_preload.preload_jiter_native_extension()`、`transports/*` 的 `register_transport()`），逐模块 import 会改动注册表与预加载状态本身。
+> 全部 155 个模块无一遗漏：顶层 116 个 `.py`，加 `lsp`（11 个）、`pet`（11 个）、`secret_sources`（6 个）、`transports`（11 个）
+> 四个子包内的 39 个（各子包计数含其 `__init__.py`）。
 >
 > **「agent 包」是什么**：`agent` 是 Hermes 的**运行时内核**——对话循环、各 LLM 厂商适配（OpenAI/Anthropic/Bedrock/Gemini/Codex/Vertex）、
 > 上下文压缩、记忆、凭证池、计费、传输层等都在这里。你的桌面应用通过 `run_agent.AIAgent`（见 `01`）间接驱动它，
@@ -51,7 +54,7 @@
 | `agent.browser_provider` | Browser Provider ABC | 内核·运行时 | BrowserProvider |
 | `agent.browser_registry` | Browser Provider Registry | 内核·运行时 | get_provider, list_providers, register_provider |
 | `agent.chat_completion_helpers` | Helper functions for the chat-completions code path. | 内核·运行时 | build_api_kwargs, build_assistant_message, cleanup_task_resources, direct_api_call, estimate_request_context_tokens, handle_max_iterations |
-| `agent.codex_responses_adapter` | Codex Responses API adapter. | 内核·运行时 | — |
+| `agent.codex_responses_adapter` | Codex Responses API adapter. | 内核·运行时 | 无公开名（顶层 20 个定义全部以 `_` 开头，另有 `logger`）|
 | `agent.codex_runtime` | Codex API runtime — App Server and Responses-API streaming paths. | 内核·运行时 | make_codex_app_server_event_bridge, run_codex_app_server_turn, run_codex_create_stream_fallback, run_codex_stream |
 | `agent.coding_context` | Coding-context awareness — base Hermes, every interactive surface. | 内核·运行时 | ContextProfile, ProjectFacts, RuntimeMode, build_coding_workspace_block, coding_compact_skill_categories, coding_selection |
 | `agent.context_breakdown` | Live session context-window breakdown for UI surfaces. | 内核·运行时 | compute_session_context_breakdown |
@@ -101,7 +104,7 @@
 | `agent.nous_rate_guard` | Cross-session rate limit guard for Nous Portal. | 内核·运行时 | clear_nous_rate_limit, format_remaining, is_genuine_nous_rate_limit, nous_rate_limit_remaining, record_nous_rate_limit |
 | `agent.onboarding` | Contextual first-touch onboarding hints. | 内核·运行时 | busy_input_hint_cli, busy_input_hint_gateway, detect_openclaw_residue, is_seen, mark_seen, openclaw_residue_hint_cli |
 | `agent.oneshot` | Shared one-off LLM requests for non-conversational helpers. | 内核·运行时 | render_template, run_oneshot |
-| `agent.pet` | Petdex pet engine — shared core for the CLI, TUI, and desktop surfaces. | 内核·Pet | — |
+| `agent.pet` | Petdex pet engine — shared core for the CLI, TUI, and desktop surfaces. | 内核·Pet | PetState, derive_pet_state, DEFAULT_SCALE, FRAMES_PER_STATE, LOOP_MS |
 | `agent.plugin_llm` | Plugin LLM facade — host-owned LLM access for trusted plugins. | 内核·运行时 | PluginLlm, PluginLlmCompleteResult, PluginLlmImageInput, PluginLlmStructuredResult, PluginLlmTextInput, PluginLlmTrustError |
 | `agent.portal_tags` | Centralized Nous Portal request tags. | 内核·运行时 | conversation_tag, get_conversation_context, hermes_client_tag, nous_portal_tags, reset_conversation_context, set_conversation_context |
 | `agent.process_bootstrap` | Process-level bootstrap helpers for ``run_agent``. | 内核·运行时 | build_keepalive_http_client |
@@ -115,7 +118,7 @@
 | `agent.retry_utils` | Retry utilities — jittered backoff for decorrelated retries. | 内核·运行时 | adaptive_rate_limit_backoff, is_zai_coding_overload_error, jittered_backoff, zai_coding_overload_retry_ceiling |
 | `agent.runtime_cwd` | Single source of truth for the agent working directory. | 内核·运行时 | clear_session_cwd, resolve_agent_cwd, resolve_context_cwd, set_session_cwd |
 | `agent.secret_scope` | Profile-scoped credential resolution for multi-profile gateway multiplexing. | 内核·运行时 | UnscopedSecretError, build_profile_secret_scope, current_secret_scope, get_secret, is_multiplex_active, load_env_file |
-| `agent.secret_sources` | External secret source integrations. | 内核·密钥 | — |
+| `agent.secret_sources` | External secret source integrations. | 内核·密钥 | SecretSource, ErrorKind, FetchResult, SECRET_SOURCE_API_VERSION, is_valid_env_name, run_secret_cli, scrub_ansi |
 | `agent.shell_hooks` | Shell-script hooks bridge. | 内核·运行时 | ShellHookSpec, allowlist_entry_for, allowlist_path, iter_configured_hooks, load_allowlist, register_from_config |
 | `agent.skill_bundles` | Skill bundles — aliases that load multiple skills under one slash command. | 内核·运行时 | build_bundle_invocation_message, bundle_path_for, delete_bundle, get_bundle, get_skill_bundles, list_bundles |
 | `agent.skill_commands` | Shared slash command helpers for skills. | 内核·运行时 | build_preloaded_skills_prompt, build_skill_invocation_message, build_stacked_skill_invocation_message, extract_user_instruction_from_skill_message, get_skill_commands, reload_skills |
@@ -176,7 +179,7 @@
 | 模块 | 用途 | 分类 | 代表 API |
 | --- | --- | --- | --- |
 | `agent.pet.constants` | Pet sprite geometry + animation-state taxonomy. | 内核·Pet | PetState, clamp_scale, cols_for_scale, resolve_cols, state_aliases_for, state_row_index |
-| `agent.pet.generate` | Pet generation — base-draft → hatch pipeline. | 内核·Pet | — |
+| `agent.pet.generate` | Pet generation — base-draft → hatch pipeline. | 内核·Pet | GenerationError, HatchResult, generate_base_drafts, hatch_pet |
 | `agent.pet.generate.atlas` | Deterministic spritesheet assembly — generated row strips → Hermes atlas. | 内核·Pet | atlas_to_webp_bytes, compose_atlas, extract_strip_frames, mirror_frames, normalize_cells, remove_background |
 | `agent.pet.generate.imagegen` | Thin image-generation layer for pet sprites. | 内核·Pet | GenerationError, SpriteProvider, generate, list_sprite_providers, resolve_provider |
 | `agent.pet.generate.orchestrate` | Pet generation orchestration — the base-draft → hatch flow. | 内核·Pet | HatchResult, generate_base_drafts, hatch_pet |
@@ -224,7 +227,18 @@
 
 #### 定位
 
-Context engine 决定「接近模型 token 上限时如何管理对话上下文」。内置 **`ContextCompressor`** 是默认实现；第三方引擎（如 LCM）可通过插件系统或放入 `plugins/context_engine/<name>/` 目录替换。
+Context engine 决定「接近模型 token 上限时如何管理对话上下文」。内置 **`ContextCompressor`** 是默认实现，同一时刻**只有一个引擎生效**。
+第三方引擎（官方文档举的例子是外部仓库 `hermes-lcm`）有两条装载路径，**只有一条真能用**：
+
+1. **普通插件注册（可用）**：`$HERMES_HOME/plugins/<name>/` 里的插件调 `ctx.register_context_engine(engine)`
+   （`hermes_cli/plugins.py` 的 `PluginContext.register_context_engine()`）。三个硬条件：engine 必须继承 `agent.context_engine.ContextEngine`（`:633` 校验，不是就忽略，即 `agent/agent_init.py` 的 `init_agent()` 内 `if _candidate is not None and _candidate.name == _engine_name:` 一处）、
+   全局只允许一个（第二个注册被拒）、`engine.name` 必须与 `context.engine` 的配置值完全一致（`agent/agent_init.py` 的 `init_agent()` 内 `if _candidate is not None and _candidate.name == _engine_name:` 一处），
+   且实例要能被 `deepcopy`（子 Agent 会复制它，复制不了就回落内置引擎，`:1860-1872`）。
+2. **`plugins/context_engine/<name>/` 目录（0.19.0 内为空）**：该发现路径解析到**包自己的目录**
+   （`plugins/context_engine/__init__.py` 的 `_CONTEXT_ENGINE_PLUGINS_DIR = Path(__file__).parent`），
+   而 wheel 内这个目录下只有 `__init__.py`——**没有任何引擎可换**，往里放文件等于改安装目录。走第 1 条。
+
+引擎**不会被自动激活**：必须显式写 `context.engine: "<name>"`（默认值 `"compressor"`，`agent/agent_init.py` 的 `init_agent()` 内 `_engine_name = _ctx_cfg.get("engine", "compressor")` 一句）。
 
 选择是**配置驱动**的：`config.yaml` 的 `context.engine`，默认 `"compressor"`（内置）。同一时刻**只有一个引擎生效**。
 
@@ -265,6 +279,9 @@ Context engine 决定「接近模型 token 上限时如何管理对话上下文�
 - 用 `config.yaml` 的 `context.engine` 选择引擎（默认 `compressor`）。
 - 写第三方引擎：实现 `ContextEngine`，放入 `plugins/context_engine/<name>/` 或经插件系统注册。
 - 调优压缩：`threshold_percent`（触发阈值占比）、`protect_first_n`/`protect_last_n`（头尾保护轮数）、`summary_target_ratio`（摘要目标占比）。
+  **`threshold_percent` 有下限**：上下文窗口小于 512K 的模型上它被 `max(值, 0.75)` 抬高（`agent/context_compressor.py` 的 `_effective_threshold_percent()`，源码注释 "raise-only"），
+  填 0.3 的实际生效值是 0.75；要更早压缩请动 `target_ratio` 与两个 `protect_*`，或换引擎。
+  换引擎之后本机的 `threshold` 系列配置**不再参与**——`agent/agent_init.py` 的 `init_agent()` 内 `agent.context_compressor = _selected_engine` 之后的注释写明外部引擎自持压缩策略、主机阈值不会传给它。
 - 依赖本技能 `references/api-reference/05-agent.md` 对应小节获取全部方法签名。
 
 ### 2.2 分层记忆系统（memory_provider / memory_manager）

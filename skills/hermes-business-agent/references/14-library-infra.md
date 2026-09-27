@@ -26,7 +26,7 @@
 
 | 模块（顶层） | 用途（0.19.0） | 代表 API | 说明 |
 | --- | --- | --- | --- |
-| `gateway` | Hermes 网关——多平台消息集成常驻服务（顶层包，77 个 `.py`） | （import 即拉起网关依赖；起服务的 `main()` 在 `gateway/run.py:22965`，`gateway` 包本身不导出 `main`） | 起 HTTP 服务、监听端口、做平台接入。**本路线不用**（详见 `10` §2.5 同名 `hermes_cli.gateway`；**包内 77 个模块已全量枚举见 `16-gateway-package.md`**） |
+| `gateway` | Hermes 网关——多平台消息集成常驻服务（顶层包，77 个 `.py`） | （import 即拉起网关依赖；起服务的 `main()` 在 `gateway/run.py` 的 `main()`，`gateway` 包本身不导出 `main`） | 起 HTTP 服务、监听端口、做平台接入。**本路线不用**（详见 `10` §2.5 同名 `hermes_cli.gateway`；**包内 77 个 `.py` 已全量枚举见 `16-gateway-package.md`**） |
 | `cli` | Hermes Agent CLI——交互式终端界面 | `ChatConsole` / `HermesCLI` / `main` | TTY 交互界面，给终端用；GUI 桌面自己画界面，不套用 |
 | `cron` | Cron 定时任务调度系统 | （import 即拉起调度依赖） | `hermes cron` 子命令；**底层 cronjob 工具逻辑**在 `tools.cronjob_tools`（进程内可用，见 `12`），本模块主函数不用 |
 | `plugins` | Hermes 插件系统 | （插件发现/加载体系） | 插件**机制**可了解（`10` §2.10 也列 `hermes_cli.plugins`）；进程内若用插件，经 `AIAgent` 的工具集/技能体系接入，不要直接 import 此模块起插件加载器 |
@@ -99,9 +99,9 @@
 | 类别 | 顶层模块 | 覆盖文件 |
 | --- | --- | --- |
 | 进程内驱动核心 | `run_agent` | `01-library-api.md` |
-| 工具实现包 | `tools`（113 嵌套子模块） | `12-tools-modules.md` |
-| 运行时内核 | `agent`（155 嵌套子模块） | `13-agent-modules.md` |
-| 统一 CLI 包 | `hermes_cli`（146 顶层 / 205 含嵌套；均不含包根 `__init__.py`） | `10-hermes-cli.md` |
+| 工具实现包 | `tools`（113 个 `.py`：顶层 94 + `computer_use`/`environments` 内 19；不含包根 `__init__.py`） | `12-tools-modules.md` |
+| 运行时内核 | `agent`（155 个 `.py`：顶层 116 + `lsp`/`pet`/`secret_sources`/`transports` 内 39；不含包根 `__init__.py`） | `13-agent-modules.md` |
+| 统一 CLI 包 | `hermes_cli`（顶层 146 个模块文件 + 3 个子包 = 149 个条目 / 205 个 `.py` 含嵌套；均不含包根 `__init__.py`） | `10-hermes-cli.md` |
 | 批量运行器 | `batch_runner` | `11-library-support.md` §1 |
 | 支撑单文件模块 | `hermes_constants` / `hermes_state` / `hermes_logging` / `hermes_time` / `hermes_bootstrap` / `model_tools` / `toolsets` / `toolset_distributions` / `utils` / `trajectory_compressor` | `11-library-support.md` §2–§11 |
 | 网关运行时顶层包 | `gateway`（77 个 `.py`） | **`16-gateway-package.md`** |

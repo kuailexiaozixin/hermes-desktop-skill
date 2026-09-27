@@ -12,7 +12,7 @@
 
 - **一条工作流主线**（`SKILL.md`）：〔入场检查〕+ 第 ①–⑧ 步 + 〔回路〕。每步有输入、动作、产出与出口判据，出口不过就进调试闭环。
 - **权威事实来源**：内置 Hermes 官方文档全文 `hermes-llms-full.txt`（随官网漂移更新），所有参考文档基于 `hermes-agent` 的锁定基线版本逐条源码内省核实（基线号见 `scripts/api-baseline.json`）。
-- **22 篇参考文档**（`references/00`–`21`）：Library API、集成路线、工具与能力层、宿主框架、打包、质量门禁、端到端验证、业务建模与运营降级。逐篇反查索引在 `references/00-index.md` §3。
+- **23 篇参考文档**（`references/00`–`22`）：Library API、集成路线、工具与能力层、宿主框架、打包、质量门禁、端到端验证、业务建模与运营降级、内核（Agent Harness）部件拆解与可改边界。逐篇反查索引在 `references/00-index.md` §3。
 - **3 个可运行示例**（`examples/`）：三系统底座 / 多智能体桌面客户端 / 官方 WebUI 三路线，见 `examples/README.md`。
 - **质量门禁脚本**（`scripts/`）：上游漂移跟踪、API 签名核对、技能结构、文档链接、端到端冒烟、发布总闸。
 
@@ -34,7 +34,7 @@ hermes-business-agent-skill/
 ├── SKILL.md                 # 唯一工作流主线（入场检查 + 八步 + 回路）与 frontmatter 版本号
 ├── CHANGELOG.md             # 版本历史
 ├── hermes-llms-full.txt     # Hermes 官方文档全文（语义权威源）
-├── references/              # 22 篇参考文档 + api-reference/（自动生成 API 参考）
+├── references/              # 23 篇参考文档 + api-reference/（自动生成 API 参考）
 ├── examples/                # 3 个参考实现（01 三系统底座 / 02 多智能体 / 03 官方 WebUI）
 ├── scripts/                 # 质量门禁与上游跟踪脚本
 ├── docs/                    # glossary.md 术语表 · troubleshooting.md 排障沉淀 · delivery-checklist.md 交付清单

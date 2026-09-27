@@ -1,7 +1,9 @@
-# 12 · `tools` 包全量模块枚举（Hermes 工具系统，0.19.0，共 113 个嵌套子模块）
+# 12 · `tools` 包全量模块枚举（Hermes 工具系统，0.19.0，共 113 个 `.py`：顶层 94 个 + 子包内 19 个；口径不含包根 `__init__.py`）
 
-> 本文件是 `tools` 包的**完整、逐模块枚举**。经 `hermes-agent==0.19.0` 已装包**逐模块 import + 读取 docstring + 提取公开 API** 核实；
-> 全部 113 个嵌套子模块无一遗漏（含 `computer_use.*` / `environments.*` 等子包）。
+> 本文件是 `tools` 包的**完整、逐模块枚举**。经 `hermes-agent==0.19.0` 已装包**逐模块读取 docstring + 用 `ast` 提取顶层公开名**核实；
+> 全程静态解析源码，不 `import`——`tools` 下 34 个模块有 import 期动作，其中 32 个在模块顶层直接 `register(...)` 把自身注册进工具表；
+> 逐模块 import 会改动这张表本身。
+> 全部 113 个模块无一遗漏：顶层 94 个 `.py`，加 `computer_use`（8 个，含其 `__init__.py`）与 `environments`（11 个，含其 `__init__.py`）两个子包内的 19 个。
 >
 > **「工具（tools）」是什么**：`tools` 是 Hermes Agent 在**进程内**真正调用的工具实现集合。
 > 当你的桌面应用 `new AIAgent()` 跑起来时，Agent 需要「读文件 / 跑命令 / 查网页 / 调 MCP」等能力，
@@ -40,8 +42,8 @@
 | `tools.clarify_tool` | Clarify Tool Module - Interactive Clarifying Questions | check_clarify_requirements, clarify_tool |
 | `tools.close_terminal_tool` | Close a read-only agent terminal tab in the Hermes desktop GUI. | check_close_terminal_requirements, close_terminal_tool |
 | `tools.code_execution_tool` | Code Execution Tool -- Programmatic Tool Calling (PTC) | build_execute_code_schema, check_sandbox_requirements, execute_code, generate_hermes_tools_module |
-| `tools.computer_use` | Computer use toolset — universal (any-model) macOS desktop control. | — |
-| `tools.computer_use_tool` | Shim for tool discovery. Registers `computer_use` with tools.registry. | — |
+| `tools.computer_use` | Computer use toolset — universal (any-model) macOS desktop control. | check_computer_use_requirements, get_computer_use_schema, handle_computer_use, set_approval_callback |
+| `tools.computer_use_tool` | Shim for tool discovery. Registers `computer_use` with tools.registry. | check_computer_use_requirements, handle_computer_use, set_approval_callback（转发 `tools.computer_use`）|
 | `tools.credential_files` | File passthrough registry for remote terminal backends. | clear_credential_files, from_agent_visible_cache_path, get_cache_directory_mounts, get_credential_file_mounts, get_skills_directory_mount, iter_cache_files |
 | `tools.cronjob_tools` | Cron job management tools for Hermes Agent. | check_cronjob_requirements, cronjob |
 | `tools.daemon_pool` | Shared daemon-thread ThreadPoolExecutor. | DaemonThreadPoolExecutor |
@@ -51,7 +53,7 @@
 | `tools.discord_tool` | Discord server introspection and management tool. | DiscordAPIError, check_discord_tool_requirements, discord_admin_handler, discord_core, get_dynamic_schema, get_dynamic_schema_admin |
 | `tools.env_passthrough` | Environment variable passthrough registry. | clear_env_passthrough, get_all_passthrough, is_env_passthrough, register_env_passthrough |
 | `tools.env_probe` | Local-environment toolchain probe for the system prompt. | get_environment_probe_line, warm_environment_probe_async |
-| `tools.environments` | Hermes execution environment backends. | — |
+| `tools.environments` | Hermes execution environment backends. | BaseEnvironment |
 | `tools.fal_common` | Shared FAL.ai SDK plumbing. | import_fal_client |
 | `tools.feishu_doc_tool` | Feishu Document Tool -- read document content via Feishu/Lark API. | get_client, set_client |
 | `tools.feishu_drive_tool` | Feishu Drive Tools -- document comment operations via Feishu/Lark API. | get_client, set_client |
@@ -59,7 +61,7 @@
 | `tools.file_state` | Cross-agent file state coordination. | FileStateRegistry, check_stale, get_registry, known_reads, lock_path, note_write |
 | `tools.file_tools` | File Tools Module - LLM agent file manipulation tools. | clear_file_ops_cache, notify_other_tool_call, patch_tool, read_file_tool, reset_file_dedup, search_tool |
 | `tools.fuzzy_match` | Fuzzy Matching Module for File Operations | find_closest_lines, format_no_match_hint, fuzzy_find_and_replace |
-| `tools.homeassistant_tool` | Home Assistant tool for controlling smart home devices via REST API. | — |
+| `tools.homeassistant_tool` | Home Assistant tool for controlling smart home devices via REST API. | HA_CALL_SERVICE_SCHEMA, HA_GET_STATE_SCHEMA, HA_LIST_ENTITIES_SCHEMA, HA_LIST_SERVICES_SCHEMA |
 | `tools.hook_output_spill` | Spill oversized hook-injected context to disk with a preview placeholder. | get_spill_config, spill_if_oversized |
 | `tools.image_generation_tool` | Image Generation Tools Module | check_fal_api_key, check_image_generation_requirements, image_generate_tool, is_krea_model |
 | `tools.image_source` | Single resolver for every vision_analyze image source -> bytes + mime. | ImageResolutionError, NotAnImage, ResolveContext, ResolvedImage, SourceNotFound, SourceTooLarge |
@@ -117,7 +119,7 @@
 | `tools.write_approval` | Write-approval gate + pending store for memory and skill writes. | GateDecision, current_origin, discard_pending, evaluate_gate, get_pending, is_background |
 | `tools.x_search_tool` | X Search tool backed by xAI's built-in ``x_search`` Responses API tool. | check_x_search_requirements, x_search_tool |
 | `tools.xai_http` | Shared helpers for direct xAI HTTP integrations. | build_xai_storage_options, get_env_value, has_xai_credentials, hermes_xai_user_agent, maybe_mark_xai_storage_notice_seen, read_xai_imagine_storage_config |
-| `tools.xai_video_tools` | xAI-specific Imagine video edit and extend tools. | — |
+| `tools.xai_video_tools` | xAI-specific Imagine video edit and extend tools. | XAI_VIDEO_EDIT_SCHEMA, XAI_VIDEO_EXTEND_SCHEMA |
 | `tools.yuanbao_tools` | yuanbao_tools.py - 元宝平台工具集 | get_group_info, query_group_members, search_sticker, send_dm, send_sticker |
 
 ### 1.2 tools.computer_use.*（7 个）

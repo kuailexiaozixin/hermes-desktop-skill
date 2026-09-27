@@ -3,7 +3,10 @@
 > 本文件覆盖 Library 中**除 `run_agent` / `tools` / `agent` / `hermes_cli` 之外**的、与桌面进程内集成**最相关**的 Hermes 自有模块：
 > `batch_runner`（批量 Agent 运行器）以及一组**单文件支撑模块**（`hermes_constants` / `hermes_state` / `hermes_logging` / `hermes_time` / `hermes_bootstrap` / `model_tools` / `toolsets` / `toolset_distributions` / `utils` / `trajectory_compressor`）。
 >
-> 全部条目经 `hermes-agent==0.19.0` 已装包**逐模块 import + 读取 docstring + 提取公开 API** 核实（数据来源：`top_level.txt` 顶层模块名单 + `importlib` 内省）。
+> 全部条目的核实方式：顶层模块名单取自已装包 `hermes-agent==0.19.0` 的 wheel 元数据 `top_level.txt`；各模块用途取自其 docstring；
+> 文中以 `名字()` 形式写出的 API，逐个用 `ast` 静态解析回指到它所归属模块的顶层命名空间（全程不 `import`）。
+> 唯一的例外是 §9 的抽样与空集行为——按该节标注，它实际 `import toolset_distributions` 跑过。
+> 各节的「**规模**」口径统一为：该模块**顶层**定义的、名字不以下划线开头的类个数与函数个数（`ast` 可直接数出来，不含从别处 import 进来的名字）。
 > 与 `10-hermes-cli.md` 的边界：`hermes_cli.*` 已在 `10` 全量列举；本文不含 `hermes_cli`，只列上述支撑模块。
 
 ---
@@ -13,7 +16,7 @@
 | 维度 | 说明 |
 | --- | --- |
 | `batch_runner` | 批量并发跑多个 Agent 任务的运行器（`BatchRunner`），适合「一次性处理一批提示词/文件」的离线批处理场景。 |
-| `hermes_constants` | 全局常量与路径解析（`HERMES_HOME` / skills 目录 / node 可执行发现 / 平台判断）。**进程内最常用**——你要知道数据落哪、怎么拿 `HERMES_HOME`。 |
+| `hermes_constants` | 全局常量与路径解析（`get_hermes_home()` 解析数据根 / skills 目录 / node 可执行发现 / 平台判断）。**进程内最常用**——你要知道数据落哪、怎么拿 `HERMES_HOME`。 |
 | `hermes_state` | SQLite 会话状态存储（`SessionDB` / `AsyncSessionDB`）。多轮会话如何落盘、如何修复损坏库，看这里。 |
 | `hermes_logging` | 集中式日志配置（文件轮转 / 会话上下文）。桌面应用想统一日志格式时复用。 |
 | `hermes_time` | 时区感知时钟（`now()` / `get_timezone()`）。替代 `datetime.now()`，避免时区漂移。 |
@@ -25,7 +28,12 @@
 | `trajectory_compressor` | 轨迹（对话轨迹）压缩器（`TrajectoryCompressor`）。批量/长对话的轨迹压缩用。 |
 
 > **适用说明（与 `07` §1、`10` §1 一致）**：本文档以**进程内直跑路线**为叙述示例；本表模块多为纯逻辑/本地支撑，是否适合直接调用须结合所选路线判断。
-> 本文模块均为**纯逻辑/本地**支撑，进程内可放心 import；但若某函数内部起子进程（如 `batch_runner` 并发拉起 Agent），
+> 本文模块都不联网、不起子进程，进程内 import 安全；但其中 4 个**在 import 期就执行动作**，引用它们时要预期这几件事已经发生：
+> `hermes_logging` 替换 stdlib logging 的全局 record factory（`hermes_logging.py` 顶层调用 `_install_session_record_factory()`（返回 `_session_record_factory`），让每条记录带 `session_tag`）；
+> `hermes_bootstrap` 顶层直接跑 `apply_windows_utf8_bootstrap()` 与 `activate_durable_lazy_target()`（这就是它的用途，模块自身的注释也说明 import 即生效）；
+> `model_tools` 顶层调用 `discover_builtin_tools()`（`tools.registry` 里那句 docstring：*“Import built-in self-registering tool modules…”*，即把内置工具全部 import 一遍并填工具表）；
+> `trajectory_compressor` 顶层调用 `load_hermes_dotenv(...)`（从 `hermes_cli.env_loader` 导入，读取 Hermes 的环境文件）。
+> 另外，若某函数内部起子进程（如 `batch_runner` 并发拉起 Agent），
 > 仍走 `run_agent.AIAgent` 的公开接口（见 `01`），不要绕过它直接复刻循环。
 
 ---
@@ -218,7 +226,7 @@
 | 用法 | 签名（实测） | 说明 |
 | --- | --- | --- |
 | 解析一个工具集到工具名 | `resolve_toolset(name, visited=None, *, include_registry=True) -> List[str]` | 递归展开 `includes`；`browser` → 13 个工具名 |
-| 多集合并去重 | `resolve_multiple_toolsets(names: List[str]) -> List[str]` | `['browser','terminal']` → 15 个（`web_search` 去重） |
+| 多集合并去重 | `resolve_multiple_toolsets(toolset_names: List[str]) -> List[str]` | `['browser','web']` → 14 个（13 + 2，重合的 `web_search` 去重）；`['browser','terminal']` → 15 个（两集无重合工具） |
 | 看某集的完整信息 | `get_toolset_info(name) -> Dict` | 含解析后的工具列表，面 diff（`19` §6）可直接用它 |
 | 运行时注册自定义集 | `create_custom_toolset(name, description, tools=None, includes=None)` | 场景 → 面 的映射由**业务代码查表**决定，禁止抽签 |
 | 枚举 | `get_toolset_names()` / `get_all_toolsets()` / `get_toolset(name)` | 基线 57 = 33 能力 + 24 `hermes-*`（`00-index` §4） |

@@ -10,7 +10,7 @@ description: >-
   业务层与 Agent 层需要一开始就解耦。宿主可以是 Python 原生 GUI（FastHTML/pywebview、Tkinter、PyQt、textual）、
   Web 前端与服务端（React/Vue/Electron/Koa），也可以是其他语言宿主（.NET/Java/C/C++/Rust），
   交付形态覆盖单文件桌面程序、带 sidecar 的本地应用与常驻服务。
-version: "1.30.0"
+version: "1.32.0"
 ---
 
 # hermes-business-agent · 把 Agent 接进真实业务流程（或从零开发 Agent 驱动的业务系统）
@@ -307,6 +307,8 @@ B 类宿主新增 JS 模块时，`scripts/check_js_modules.py` 与 `scripts/chec
 **输入**：第 ① 步的六张契约表、第 ③④ 步跑通的空壳。**产出**：面表上每一格都落到一个真实注册的工具，
 且每个工具都带着快照段、结论 schema 与 Golden 用例。这一步和第 ① 步合起来是「业务智能体」区别于「能聊天的小工具」的地方。
 总原则只有一句：**优先用 Hermes 官方预留的非侵入扩展面，不要改 `hermes-agent` 包源码**——改核 = 升级即丢失、无法 pip 同步、审计回滚困难。
+一条要求落在内核哪个部件、能改到哪一档（配置行 / 扩展面 / 只有改源码才动得了），逐条带源码位置与定档动作，见
+[`references/22-harness-engineering.md`](references/22-harness-engineering.md) §2、§4、§6。
 
 **动作 1 · 给每个候选能力选一条落地的路。** 按下面 1→5 依次问，问到"是"就停，禁止一上来就写插件。
 五面的完整参数与机制见 [`references/02-integration-core.md`](references/02-integration-core.md)：Skill §10 / MCP §11 / Plugin §12 /

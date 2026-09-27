@@ -129,6 +129,20 @@ def step_doc_links() -> tuple[bool, str, str]:
         return True, out, "skip"
     return ok, out, ("pass" if ok else "fail")
 
+
+def step_module_tables() -> tuple[bool, str, str]:
+    """[7] 模块清单表对账（check_module_tables.py）。kind ∈ {pass, fail, skip}。
+
+    `10`/`12`/`13`/`16` 的「全量模块清单」逐行与已装 hermes-agent 源码核对：模块是否
+    存在、代表 API 名是否在该模块命名空间、分组标题的（N 个）是否等于行数、口径数是否等于实测；
+    `11` 各节的「规模：N 类 / M 函数」也按同一份源码实测。
+    未装 hermes-agent 时 rc==2 降级 skip（此时这些清单无法核对，不算失败）。
+    """
+    ok, out, rc = _run_step("module_tables", ["scripts/check_module_tables.py"])
+    if rc == 2:
+        return True, out, "skip"
+    return ok, out, ("pass" if ok else "fail")
+
 def main() -> int:
     quiet = "--quiet" in sys.argv[1:]
     results: list[tuple[str, bool, str, str]] = []  # (label, passed, output, kind)
@@ -154,6 +168,10 @@ def main() -> int:
     # [6] doc_links
     p, o, kind = step_doc_links()
     results.append(("文档链接完整性 (check_doc_links)", p, o, kind))
+
+    # [7] module_tables
+    p, o, kind = step_module_tables()
+    results.append(("模块清单表对账 (check_module_tables)", p, o, kind))
 
     # 输出
     print("=" * 64)

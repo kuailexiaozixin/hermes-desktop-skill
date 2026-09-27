@@ -9,7 +9,7 @@
 > 两者不是「两块」，而是「一面」——没有界面的 Agent 用不起来，不懂业务的 Agent 只是空壳。
 > 本技能一律把它们当作**一个整体**来设计：扩展面优先、改核为最后手段。
 >
-> **与其它参考的分工（避免重复）**：`03` = 工具集（能力→工具）单一全量参考；`10` = `hermes_cli` 147 模块清单；
+> **与其它参考的分工（避免重复）**：`03` = 工具集（能力→工具）单一全量参考；`10` = `hermes_cli` 顶层条目清单；
 > `01` = Library API；`04` = 渲染框架桥接；`08` = 能力层语义；`07` = 红线；`12`/`13` = 模块枚举。
 > 本文是「业务 ↔ Agent」整合的**唯一总入口**，不与上述任何一篇重复。
 
@@ -71,7 +71,7 @@
 - **进程拓扑**：网关常驻进程（可多 profile 各一个）+ 你的界面进程；默认内部起 HTTP 服务于 `127.0.0.1:8642`。
 - **交付形态**：服务 + 客户端两段交付；`HERMES_HOME` 成为共享运行数据根，profile 各自隔离 config/记忆/技能。
 - **新增代价**：进程生命周期管理（开机自启、崩溃重启、cgroup 清理）、跨进程状态同步、平台凭据与回调地址配置、端口与鉴权面。
-- **落地**：`16-gateway-package.md`（77 模块逐一 + 平台双轨适配器）+ `06` §9（服务侧守护、日志、滚动升级与回滚）。
+- **落地**：`16-gateway-package.md`（包内 77 个 `.py` 逐一 + 平台双轨适配器）+ `06` §9（服务侧守护、日志、滚动升级与回滚）。
 
 ### 2.3 路线③ spawn CLI 子进程
 
@@ -153,13 +153,13 @@ Mermaid/代码复制后处理。
 
 ## 4. 复用 `hermes_cli` 逻辑（不 spawn 子进程）
 
-`hermes_cli` 是统一 CLI 包（含 **147 个顶层模块**，含嵌套共 205），子命令
+`hermes_cli` 是统一 CLI 包（顶层 **146 个模块文件 + 3 个子包 = 149 个条目**，含嵌套共 205 个 `.py`，两个口径都不含包根 `__init__.py`），子命令
 `chat` / `gateway` / `setup` / `status` / `cron` / `mcp` / `bundles` / `project` / `kanban` /
 `backup` / `doctor` / `plugins` / `portal` 等。进程内路线**不调用 `hermes` 可执行**，但若需要
 某条 CLI 的纯逻辑（如配置读写、MOA 预设解析、定时任务底层、能力状态内核），**直接 import 对应
 子模块**即可，无需子进程。
 
-> **详细的分组清单、逐模块用途与代表 API、可复用模块最小代码的完整说明，全部移入 [`10-hermes-cli.md`](10-hermes-cli.md)**（顶层 147 模块，不交叉不重合）。
+> **详细的分组清单、逐模块用途与代表 API、可复用模块最小代码的完整说明，全部移入 [`10-hermes-cli.md`](10-hermes-cli.md)**（149 个顶层条目全覆盖；其中 8 个模块跨主题，在两组各出现一次，第二处只留指针）。
 > 本节只保留路线红线，具体复用点对 10 查阅，避免两文重复。
 
 **复用建议（与 `07` §1 R1/R3 一致）**：`hermes_cli` 多数「起服务 / 监听端口 / TTY 交互 / 网络认证」类模块依赖完整 CLI 运行时
@@ -389,7 +389,7 @@ Hermes 预留了 **4 类非侵入扩展面**，对接业务时优先用它们，
 
 ## 10. 扩展面① Skill：`SKILL.md` + 脚本挂 `$HERMES_HOME/skills/`
 
-**路径（核实 `tools/skills_hub.py:67-69`，`_skills_dir()` 返回 `$HERMES_HOME/skills`）**：`$HERMES_HOME/skills/<name>/SKILL.md` 是单一真相源（single source of truth）。
+**路径（核实 `tools/skills_hub.py` 的 `_skills_dir()`，它返回 `$HERMES_HOME/skills`；注意 `hermes_cli/skills_hub.py` 是另一个同名文件，没有这个函数）**：`$HERMES_HOME/skills/<name>/SKILL.md` 是单一真相源（single source of truth）。
 
 **结构**：
 ```
@@ -403,7 +403,7 @@ $HERMES_HOME/skills/<name>/
 
 **安装（两种方式，均无需改核）**：
 - 从 Hub / Git 安装（带安全扫描）：`hermes skills install <owner/repo/skills/name>`
-- 直接放目录：把目录放进 `$HERMES_HOME/skills/` 即生效，**无需注册、无需重启**（`hermes-llms-full.txt` 原话 `"Drop it in ~/..."`，可 grep，禁止记行号）
+- 直接放目录：把目录放进 `$HERMES_HOME/skills/` 即生效，**无需注册、无需重启**（`hermes-llms-full.txt` 原话 "Drop it in `~/.hermes/skills/` and it's live."，可 grep，禁止记行号）
 
 **自动注册**：每个已装 skill 自动成为 slash 命令（名字即命令；`hermes-llms-full.txt` 的 `"every installed skill becomes a slash command"` 一句）。
 
@@ -415,7 +415,7 @@ $HERMES_HOME/skills/<name>/
 
 ## 11. 扩展面② MCP server：FastMCP 经 `hermes mcp add` 接入（零 Hermes 源码）
 
-**命令（核实 `subcommands/mcp.py:41-73`，源码内省参数）**：
+**命令（核实 `hermes_cli/subcommands/mcp.py` 的 `build_mcp_parser()`，源码内省参数）**：
 ```bash
 # HTTP / SSE 形态的 MCP server
 hermes mcp add <name> --url https://mcp.example.com/mcp [--auth oauth|header]
@@ -430,8 +430,8 @@ hermes mcp add my-codex --preset codex
 参数清单：`name`(配置键) · `--url` · `--command` · `--args`(REMAINDER，须放最后) · `--auth` · `--preset` · `--connect-timeout` · `--env`(KEY=VALUE)。
 
 **含义**：把**一个外部 MCP server** 接进 Hermes；连上后该 server 的工具注册进一个按服务名动态生成的 toolset
-`mcp-<name>`（`tools/mcp_tool.py:5036`）。静态 `TOOLSETS` 全量表里**没有** `mcp` 这一项（0.19.0 实测 57 项无 mcp），
-`mcp-<name>` 由运行时注册表解析、不写回 `toolsets.TOOLSETS`（`tools/mcp_tool.py:5024-5028`）——
+`mcp-<name>`（`tools/mcp_tool.py` 的 `_register_server_tools()` 内 `toolset_name = f"mcp-{name}"`）。静态 `TOOLSETS` 全量表里**没有** `mcp` 这一项（0.19.0 实测 57 项无 mcp），
+`mcp-<name>` 由运行时注册表解析、不写回 `toolsets.TOOLSETS`（同函数 docstring 讲 toolset 解析那一段）——
 所以按名减法（`disabled_toolsets`）只能对已连上的服务生效，未连接时那里根本查不到这个名字。
 
 **写法**：用 [FastMCP](https://github.com/jlowin/fastmcp)（或任意 MCP SDK）写一个 stdio server 进程。Hermes 侧只多一条配置，**不改 `hermes-agent` 一行源码**。
@@ -440,13 +440,13 @@ hermes mcp add my-codex --preset codex
 
 **工具面约束**：接好后用 `hermes mcp configure <name>`（帮助文本 "Toggle tool selection"）勾选要开放的工具，
 或直接写配置文件 `mcp_servers.<name>.tools.include` / `.exclude`——白名单优先于黑名单，两者都不写则全量注册
-（规则与行号见 `tools/mcp_tool.py:5038-5052`）。对外只暴露只读面时按工具名收紧白名单，禁止给 Agent 过多写权限。
+（规则见 `tools/mcp_tool.py` 的 `_register_server_tools()` 内 "honour include/exclude lists from config" 那一段）。对外只暴露只读面时按工具名收紧白名单，禁止给 Agent 过多写权限。
 
 ---
 
 ## 12. 扩展面③ Plugin：`$HERMES_HOME/plugins/`，`tool_override` / `ctx.llm`
 
-**路径（核实 `hermes_cli/plugins.py:10-13` 的四种来源枚举、`:1350` 用户插件目录、`:217` entry-point group）**：
+**路径（四种来源枚举写在 `hermes_cli/plugins.py` 的模块 docstring 开头；用户插件目录见同文件 `_user_plugins_dir()` 一类取 `$HERMES_HOME/plugins` 的地方；entry-point group 见同文件读 `hermes_agent.plugins` 的分支）**：
 - 用户插件：`$HERMES_HOME/plugins/<name>/`
 - 项目插件：`./.hermes/plugins/<name>/`（需 `HERMES_ENABLE_PROJECT_PLUGINS=1`）
 - pip 插件：暴露 `hermes_agent.plugins` entry-point group 的包
@@ -461,10 +461,10 @@ $HERMES_HOME/plugins/<name>/
 **能力（`ctx` = `PluginContext`，核实 `plugins.py`）**：
 | API | 作用 |
 | --- | --- |
-| `ctx.register_tool(name=, toolset=, schema=, handler=, override=False)` | 注册一个 Agent 可调用的工具（签名核实 `hermes_cli/plugins.py:391`） |
+| `ctx.register_tool(name=, toolset=, schema=, handler=, override=False)` | 注册一个 Agent 可调用的工具（签名核实 `hermes_cli/plugins.py` 的 `PluginContext.register_tool()`） |
 | `ctx.register_hook(name, cb)` / `ctx.register_middleware(kind, cb)` | 生命周期钩子 / 中间件 |
 | `ctx.register_memory_provider(p)`（memory 插件专用 ctx） | 注册内存后端——经 `plugins/memory/<name>/` 插件目录发现并调用（见 §13）；注意主 `PluginContext` 无此方法 |
-| `ctx.llm` | 宿主托管的 LLM facade（`hermes_cli/plugins.py:351` 属性 → `agent/plugin_llm.py:598` 的 `PluginLlm`）——可信插件用它跑 host-owned 补全 / 结构化输出 |
+| `ctx.llm` | 宿主托管的 LLM facade（`hermes_cli/plugins.py` 的 `PluginContext.llm` 属性 → `agent/plugin_llm.py` 的 `class PluginLlm`）——可信插件用它跑 host-owned 补全 / 结构化输出 |
 
 **`ctx.llm` 宿主推理 —— 等价「依赖注入 + 强类型结构化输出」（原生能力，`agent/plugin_llm.py`）**：
 插件用宿主已配置的模型/鉴权跑推理，**不必自带 provider key**；provider/model/agent_id/profile 覆写默认
@@ -493,7 +493,7 @@ order = ctx.llm.complete_structured(
 > 的结构化结果再喂给 Agent 工具或业务流程；schema 校验依赖可选 `jsonschema` 包（缺装时 JSON 模式仍可用）。
 > 这是进程内桌面「Agent 输出落业务表单/表格」的最稳路径。
 
-**`tool_override` 信任门（核实 `hermes_cli/plugins.py:419` 拒绝点、`:470-472` 读开关）**：`override=True` 覆盖内置工具（如 `shell_exec`/`write_file`）时，需用户在 `config.yaml` 显式设
+**`tool_override` 信任门（核实 `hermes_cli/plugins.py` 的 `register_tool()` 内 `if override and not self._tool_override_allowed(name):` 拒绝点，与同文件 `_tool_override_allowed()` 读开关处）**：`override=True` 覆盖内置工具（如 `shell_exec`/`write_file`）时，需用户在 `config.yaml` 显式设
 ```yaml
 plugins:
   entries:
@@ -508,9 +508,9 @@ plugins:
 
 ## 13. 扩展面④ Memory backend：内置可插拔，换后端走配置 / `MemoryProvider` 注册
 
-**抽象（核实 `agent/memory_provider.py:43`）**：`class MemoryProvider(ABC)` —— 任何记忆后端的契约（`name` / 写入 / 读取 / 同步生命周期）。
+**抽象（核实 `agent/memory_provider.py` 的 `class MemoryProvider(ABC)`）**：`class MemoryProvider(ABC)` —— 任何记忆后端的契约（`name` / 写入 / 读取 / 同步生命周期）。
 
-**可识别的 provider 标识（核实 `memory_provider.py:49,303`，0.19.0）**：`builtin`（默认内置）；经 `plugins/memory/` 插件目录提供的 bundled provider 有 `honcho` / `hindsight` / `mem0` / `openviking` / `byterover` / `holographic` / `retaindb` / `supermemory`（契约 docstring 与备份逻辑点名 `~/.honcho`、`~/.hindsight`、`~/.openviking` 等）。
+**可识别的 provider 标识（核实 `agent/memory_provider.py` 的 `MemoryProvider.name` 属性 docstring 与文件末的 provider 名列表，0.19.0）**：`builtin`（默认内置）；经 `plugins/memory/` 插件目录提供的 bundled provider 有 `honcho` / `hindsight` / `mem0` / `openviking` / `byterover` / `holographic` / `retaindb` / `supermemory`（契约 docstring 与备份逻辑点名 `~/.honcho`、`~/.hindsight`、`~/.openviking` 等）。
 
 **切换 / 新增 provider = 插件发现 + 配置驱动（核实 `plugins/memory/`，0.19.0）**：memory provider 由 **`plugins/memory/<name>/` 插件目录自动发现**（bundled 随包 + 用户 `$HERMES_HOME/plugins/<name>/`），每子目录含 `__init__.py` 实现 `MemoryProvider` 子类；**同一时刻仅一个 provider 生效**，由 config.yaml `memory.provider` 选择。交互式配置见 `hermes_cli/memory_setup.py`（自动发现 / 装依赖 / 走 schema），OAuth 见 `hermes_cli/memory_oauth.py`。
 
@@ -527,7 +527,9 @@ def register(ctx):
 ```
 —— 你写的是**插件代码**，**不改 `hermes-agent` 核心**。
 
-**注意：关于 "FTS5" 的澄清（针对源码内省）**：FTS5 是 SQLite 的全文检索引擎，随 `apsw` 在 wheel 内提供；但在已装版本的 `agent` 记忆层并未直接引用 FTS5（`agent/` 包内无 fts5 字样）。把 "FTS5" 当成一个可切换的 provider **名**不成立——它更接近内置 SQLite 存储的实现细节。换后端的正确动作是：选 `builtin` 或某个已声明的 provider（配置切换），或自写 `MemoryProvider`（插件）。若你看到文档把 FTS5 列为 provider，那大概率来自更高版本的文档，请以本机已装版本为准。
+**注意：关于 "FTS5" 的澄清（针对源码内省）**：FTS5 是 SQLite 的全文检索引擎，在 Hermes 里的载体是**标准库 `sqlite3` 自带的那份 SQLite**（`hermes_state.py` 模块顶部 `import sqlite3`；虚拟表 DDL 在 `FTS_SQL` 与 `FTS_TRIGRAM_SQL` 两个常量里，能力探测在 `_sqlite_supports_fts5()`，全文检索机制另见 `22` §8） 与 `:958`，能力在运行期探测 `:1170 _sqlite_supports_fts5`，探测不过就记警告并降级、不抛错）——**与 `apsw` 无关**：hermes-agent 自己的模块里没有一处 `import apsw`（逐包 grep 核实）。另外，`agent/` 记忆层确实不引用 FTS5（包内无 fts5 字样，全文检索住在 `hermes_state` 的会话表里）。把 "FTS5" 当成一个可切换的 provider **名**不成立——它更接近内置 SQLite 存储的实现细节。换后端的正确动作是：选 `builtin` 或某个已声明的 provider（配置切换），或自写 `MemoryProvider`（插件）。若你看到文档把 FTS5 列为 provider，那大概率来自更高版本的文档，请以本机已装版本为准。
+
+**还有一条容易踩的注册面差别**：记忆后端插件的 `register(ctx)` 收到的不是通用 `PluginContext`，而是 `plugins/memory/__init__.py` 里的 `class _ProviderCollector`（源码注释自称 "Fake plugin context"）——它只接 `register_memory_provider`，`register_tool` / `register_hook` / `register_cli_command` 全是空实现。**想借记忆后端顺手注册业务工具是无效的**，业务工具走 §7.1 或 §12。
 
 **进程内注意**：冻结态的数据根**要你自己钉**——库不感知 `sys.frozen`，启动器不设 `HERMES_HOME` 就退回平台默认根；钉法与"为什么不能按 `_MEIPASS` 相对算根"见 `05` §3（R8）。provider 状态默认落 `<hermes_home>/<provider>/`。
 

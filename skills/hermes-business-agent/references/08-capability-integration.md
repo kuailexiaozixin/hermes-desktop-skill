@@ -211,7 +211,7 @@ _moa.resolve_moa_preset(raw["moa"], name)          # 不存在抛 KeyError
 raw["moa"] = _moa.set_active_moa_preset(raw["moa"], name)
 _cfg.save_config(raw)
 #    同时把 llm.json 顶层置 provider="moa" / model=name，
-#    使 AIAgent.__init__ 自动走 MoAClient（agent/agent_init.py:871-872）
+#    使 AIAgent.__init__ 自动走 MoAClient（`agent/agent_init.py` 的 `init_agent()` 内 `elif agent.provider == "moa":` 一处）
 ```
 
 **GUI 桥接范式**：预设编辑器绑定 `moa_get()/moa_save()/moa_set_active()/moa_delete()`；
